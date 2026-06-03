@@ -1,0 +1,33 @@
+{
+  "aggregators": [
+    {
+      "name": "some_publisher",
+      "reset_on_get": false,
+      "trigger_names": [
+        "some_trigger"
+      ],
+      "message_builder": {
+        "field_assignments": [
+          {
+            "field_name": "timestamp",
+            "aggregation": {
+              "@type": "none",
+              "expression": "timestamp(REALTIME_CLOCK)"
+            }
+          }
+        ]
+      }
+    }
+  ],
+  "triggers": [
+    {
+      "name": "some_trigger",
+      "periodic": {
+        "period_ms": 1200
+      }
+    }
+  ],
+  "stop_trigger_name": "some_trigger",
+  "start_trigger_name": "some_trigger",
+  "report_configs": []
+}

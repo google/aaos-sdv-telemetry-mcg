@@ -1,0 +1,113 @@
+// Copyright 2023 Google LLC
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+// Defines a schema for SOMEIP types in VSIDL.
+
+syntax = "proto3";
+
+package sdv.vsidl;
+
+// Type definition for a SOME/IP message. It can be a primitive, string, array or struct type.
+// This definition contains information needed to map SOME/IP types to SDV messages
+message SomeIpType {
+  // Primitive types supported by SOMEIP
+  enum SomeIpPrimitive {
+    UNKNOWN_TYPE = 0;
+    BOOL = 1;
+    INT8 = 2;
+    INT16 = 3;
+    INT32 = 4;
+    INT64 = 5;
+    UINT8 = 6;
+    UINT16 = 7;
+    UINT32 = 8;
+    UINT64 = 9;
+    FLOAT32 = 10;
+    FLOAT64 = 11;
+  }
+
+  // Enum representing possible sizes of length field in bytes - used in SomeIpString, SomeIpArray
+  // and SomeIpStruct
+  enum LengthFieldSize {
+    UNSPECIFIED_SIZE = 0;
+    ONE = 1;
+    TWO = 2;
+    FOUR = 3;
+    ZERO = 5;
+  }
+
+  // Type definition for SOME/IP strings
+  message SomeIpString {
+    // Represents the encoding used for a string
+    enum StringEncoding {
+      UNSPECIFIED_ENCODING = 0;
+      // UTF 8 encoding
+      UTF_8 = 1;
+      // UTF 16 Big Endian encoding
+      UTF_16_BE = 2;
+      // UTF 16 Little Endian encoding
+      UTF_16_LE = 3;
+    }
+
+    oneof string_length {
+      // Represents the fixed length of the string in bytes.
+      uint32 fixed_length = 1;
+      // For dynamic length strings, this represents the length of the 'length' field in bytes, used
+      // to store the length of the string in bytes.
+      LengthFieldSize length_field_size = 2;
+    }
+    // Represents the encoding used for this string.
+    StringEncoding string_encoding = 3;
+  }
+
+  // Type definition for SOME/IP arrays
+  message SomeIpArray {
+    oneof array_length {
+      // Represents the number of elements in the array.
+      uint32 fixed_length = 1;
+      // For dynamic length arrays, this represents the size of the length field used to store the
+      // number of elements in the array.
+      LengthFieldSize length_field_size = 2;
+    }
+    // Type of the array elements.
+    SomeIpType array_type = 3;
+  }
+
+  // Type definition for SOME/IP structs
+  message SomeIpStruct {
+    // Type definition for SOME/IP struct fields
+    message SomeIpStructField {
+      // An optional data tag used to identify struct fields. If absent, the struct fields are
+      // serialized in the order in which they appear in the struct type definition
+      optional uint32 data_tag = 1;
+      // Struct field name. This name matches the corresponding field name in the proto type
+      // definition
+      string field_name = 2;
+      // Struct field data type
+      SomeIpType field_type = 3;
+    }
+    // Size of the length field used by the struct type to store its length in bytes
+    optional LengthFieldSize length_field_size = 1;
+    // Fields of the struct type
+    repeated SomeIpStructField field = 2;
+  }
+
+  // A SOME/IP type can be one of the following types
+  oneof someip_type {
+    SomeIpPrimitive someip_primitive = 1;
+    SomeIpString someip_string = 2;
+    SomeIpArray someip_array = 3;
+    SomeIpStruct someip_struct = 4;
+  }
+}

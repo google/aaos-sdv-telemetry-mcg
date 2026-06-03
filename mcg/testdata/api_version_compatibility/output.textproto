@@ -1,0 +1,66 @@
+version: 3758096386
+descriptor_protos {
+  name: "adhoc.proto"
+  package: "aaos.sdv.telemetry.adhoc"
+  message_type {
+    name: "aggregator"
+    field {
+      name: "field"
+      number: 1
+      type: TYPE_INT32
+    }
+  }
+  syntax: "proto2"
+}
+triggers {
+  name: "data_trigger"
+  data_trigger {
+    source_name: "data_source_2"
+  }
+}
+triggers {
+  name: "periodic_trigger"
+  periodic_trigger {
+    interval {
+      seconds: 1
+    }
+  }
+}
+sources {
+  name: "data_source_2"
+  data_source {
+    source_identifier: "google.protobuf.Int32Value"
+    connection_type: SUBSCRIPTION
+  }
+}
+sources {
+  name: "data_source"
+  data_source {
+    source_identifier: "google.protobuf.Int32Value"
+    connection_type: ON_DEMAND
+  }
+}
+sources {
+  name: "aggregator"
+  aggregator {
+    trigger_names: "periodic_trigger"
+    message_builder {
+      message_type: ".aaos.sdv.telemetry.adhoc.aggregator"
+      field_assignments {
+        field_name: "field"
+        no_aggregation {
+          expression_node_index: 0
+        }
+      }
+    }
+  }
+}
+expression_nodes {
+  field_leaf_node {
+    source_name: "data_source"
+    field_names: "value"
+  }
+}
+start_trigger_name: "periodic_trigger"
+stop_trigger_name: "data_trigger"
+deactivate_trigger_name: "data_trigger"

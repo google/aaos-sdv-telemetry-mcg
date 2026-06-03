@@ -1,0 +1,70 @@
+# Copyright 2025 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+load("@rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "vs_cache",
+    srcs = [
+        "vs_cache.go",
+        "vs_cache_local.go",
+        "vs_cache_redis.go",
+    ],
+    importpath = "sdv.googlesource.com/mcg/mcg/vs_cache",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//mcg/errors",
+        "//mcg/type_resolvers",
+        "@com_github_gin_gonic_gin//:gin",
+        "@com_github_redis_go_redis_v9//:go-redis",
+    ],
+)
+
+go_test(
+    name = "vs_cache_test",
+    size = "small",
+    srcs = ["vs_cache_test.go"],
+    data = [
+        "//mcg/testdata:exported_testdata",
+    ],
+    race = "on",
+    deps = [
+        ":vs_cache",
+        "//mcg/testhelper",
+        "@com_github_google_go_cmp//cmp",
+        "@com_github_google_go_cmp//cmp/cmpopts",
+        "@org_golang_google_protobuf//reflect/protoreflect",
+    ],
+)
+
+go_test(
+    name = "vs_cache_integration_test",
+    size = "small",
+    srcs = ["vs_cache_redis_test.go"],
+    data = [
+        "//mcg/testdata:exported_testdata",
+    ],
+    tags = ["manual"],
+    deps = [
+        ":vs_cache",
+        "//mcg/testhelper",
+        "@com_github_cenkalti_backoff//:backoff",
+        "@com_github_google_go_cmp//cmp",
+        "@com_github_google_go_cmp//cmp/cmpopts",
+        "@com_github_ory_dockertest//:dockertest",
+        "@com_github_ory_dockertest//docker",
+        "@com_github_redis_go_redis_v9//:go-redis",
+        "@org_golang_google_protobuf//reflect/protoreflect",
+    ],
+)

@@ -1,0 +1,62 @@
+descriptor_protos {
+  name: "test.proto"
+  message_type {
+    name: "TestMessage"
+    field {
+      name: "sources"
+      type: TYPE_STRING
+    }
+    field {
+      name: "stop_trigger_name"
+      type: TYPE_STRING
+    }
+    field {
+      name: "source_name"
+      type: TYPE_STRING
+    }
+  }
+  enum_type {
+    name: "TestEnum"
+    value {
+      name: "ON_DEMAND"
+      number: 0
+    }
+  }
+}
+triggers {
+  name: "my_trigger"
+  data_trigger {
+    source_name: "my_source"
+  }
+}
+sources {
+  name: "my_source"
+  data_source {
+    source_identifier: "my_service"
+    connection_type: ON_DEMAND
+  }
+}
+sources {
+  name: "my_aggregator"
+  aggregator {
+    trigger_names: "my_trigger"
+    message_builder {
+      message_type: ".google.protobuf.UInt32Value"
+      field_assignments {
+        field_name: "value"
+        no_aggregation {
+          expression_node_index: 0
+        }
+      }
+    }
+  }
+}
+expression_nodes {
+  field_leaf_node {
+    source_name: "my_source"
+    field_names: "a"
+  }
+}
+stop_trigger_name: "my_trigger"
+deactivate_trigger_name: "my_trigger"
+retain_aggregations_on_stop: true

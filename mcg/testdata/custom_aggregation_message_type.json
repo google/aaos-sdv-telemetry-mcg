@@ -1,0 +1,77 @@
+{
+  "triggers": [
+    {
+      "name": "periodic_trigger",
+      "periodic": {
+        "period_ms": 1000
+      }
+    },
+    {
+      "name": "time_series_new_data_trigger",
+      "data": {
+        "source_name": "time_series"
+      }
+    }
+  ],
+  "data_sources": [
+    {
+      "name": "location_getter",
+      "source_identifier": "LocationService",
+      "connection_type": "ON_DEMAND"
+    }
+  ],
+  "aggregators": [
+    {
+      "name": "time_series",
+      "trigger_names": ["periodic_trigger"],
+      "message_builder": {
+        "field_assignments": [
+          {
+            "field_name": "latitude",
+            "aggregation": {
+              "@type": "none",
+              "expression": "1"
+            }
+          },
+          {
+            "field_name": "longitude",
+            "aggregation": {
+              "@type": "none",
+              "expression": "2"
+            }
+          },
+          {
+            "field_name": "altitude",
+            "aggregation": {
+              "@type": "none",
+              "expression": "3"
+            }
+          },
+          {
+            "field_name": "timestamp",
+            "aggregation": {
+              "@type": "none",
+              "expression": "timestamp(REALTIME_CLOCK)"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "time_series_agg",
+      "trigger_names": ["time_series_new_data_trigger"],
+      "message_builder": {
+        "field_assignments": [
+          {
+            "field_name": "values",
+            "aggregation": {
+              "@type": "vector",
+              "expression": "time_series",
+              "max_length": 100
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

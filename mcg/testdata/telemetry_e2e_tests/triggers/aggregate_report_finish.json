@@ -1,0 +1,65 @@
+{
+  "existing_uuid": "27db53b8-ece1-4007-b259-bac50bbcaacf",
+  "triggers": [
+    {
+      "name": "collection_interval",
+      "periodic": {
+        "period_ms": 300
+      }
+    },
+    {
+      "name": "finish_trigger",
+      "periodic": {
+        "period_ms": 1000
+      }
+    }
+  ],
+  "deactivate_trigger_name": "finish_trigger",
+  "data_sources": [
+    {
+      "name": "acceleration_publisher",
+      "source_identifier": ".google.sdv.telemetry_samples.Acceleration",
+      "connection_type": "ON_DEMAND"
+    }
+  ],
+  "aggregators": [
+    {
+      "name": "acceleration_list",
+      "trigger_names": [
+        "collection_interval",
+        "finish_trigger"
+      ],
+      "message_builder": {
+        "field_assignments": [
+          {
+            "field_name": "value",
+            "aggregation": {
+              "@type": "vector",
+              "expression": "acceleration_publisher.acceleration"
+            }
+          }
+        ]
+      }
+    }
+  ],
+  "report_configs": [
+    {
+      "name": "report",
+      "trigger_names": [
+        "finish_trigger"
+      ],
+      "message_builder": {
+        "field_assignments": [
+          {
+            "field_name": "value",
+            "aggregation": {
+              "@type": "none",
+              "expression": "acceleration_list.value"
+            }
+          }
+        ]
+      }
+    }
+  ],
+  "vehicle_signals": "CoIBCiZ0cmlnZ2Vyc19hZ2dyZWdhdGVfcmVwb3J0X2ZpbmlzaC5wcm90bxIcZ29vZ2xlLnNkdi50ZWxlbWV0cnlfc2FtcGxlcyIyCgxBY2NlbGVyYXRpb24SIgoMYWNjZWxlcmF0aW9uGAEgASgFUgxhY2NlbGVyYXRpb25iBnByb3RvMw=="
+}

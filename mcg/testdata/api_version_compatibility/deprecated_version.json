@@ -1,0 +1,54 @@
+{
+  "publishers": [
+    {
+      "name": "data_source",
+      "service": {
+        "service_name": "google.protobuf.Int32Value",
+        "connection_type": "GETTER"
+      }
+    },
+    {
+      "name": "data_source_2",
+      "service": {
+        "service_name": "google.protobuf.Int32Value"
+      }
+    },
+    {
+      "name": "aggregator",
+      "aggregation": {
+        "trigger_names": ["periodic_trigger"],
+        "message_builder": {
+          "field_assignments": [
+            {
+              "field_name": "field",
+              "aggregation": {
+                "@type": "none",
+                "expression": "data_source.value"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "triggers": [
+    {
+      "name": "data_trigger",
+      "data": {
+        "publisher_name": "data_source_2"
+      }
+    },
+    {
+      "name": "periodic_trigger",
+      "periodic": {
+        "period_ms": 1000
+      }
+    }
+  ],
+  "start_trigger_name": "periodic_trigger",
+  "end_trigger_name": "data_trigger",
+  "finish_trigger_name": "data_trigger",
+  "service_type_hints": {
+    "google.protobuf.Int32Value": "google.protobuf.Int32Value"
+  }
+}

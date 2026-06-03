@@ -1,0 +1,70 @@
+version: 3758096386
+triggers {
+  name: "parent"
+  periodic_trigger {
+    interval {
+      seconds: 1
+    }
+  }
+}
+triggers {
+  name: "trigger_const"
+  conditional_trigger {
+    trigger_names: "parent"
+    falling_edge {
+      initialize_node_index: 1
+    }
+    selector_node_index: 0
+  }
+}
+triggers {
+  name: "trigger_diff"
+  conditional_trigger {
+    trigger_names: "parent"
+    all_changes {
+      initialize_node_index: 2
+    }
+    selector_node_index: 0
+  }
+}
+triggers {
+  name: "trigger_same"
+  conditional_trigger {
+    trigger_names: "parent"
+    rising_edge {
+      initialize_node_index: 0
+    }
+    selector_node_index: 0
+  }
+}
+sources {
+  name: "MySource"
+  data_source {
+    source_identifier: ".mcg.test.car_speed_msg"
+    connection_type: SUBSCRIPTION
+  }
+}
+sources {
+  name: "OtherSource"
+  data_source {
+    source_identifier: ".mcg.test.engine_speed_msg"
+    connection_type: SUBSCRIPTION
+  }
+}
+expression_nodes {
+  field_leaf_node {
+    source_name: "MySource"
+    field_names: "speed"
+  }
+}
+expression_nodes {
+  constant_leaf_node {
+    int32_value: 123
+  }
+}
+expression_nodes {
+  field_leaf_node {
+    source_name: "OtherSource"
+    field_names: "speed"
+  }
+}

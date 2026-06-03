@@ -1,0 +1,76 @@
+{
+    "existing_uuid": "27f28563-9352-4f39-86d9-d5e67e793084",
+    "triggers": [
+        {
+            "name": "data_trigger",
+            "data": {
+                "source_name": "data_source"
+            }
+        },
+        {
+            "name": "start_trigger",
+            "periodic": {
+                "period_ms": 500
+            }
+        },
+        {
+            "name": "end_trigger",
+            "periodic": {
+                "period_ms": 400
+            }
+        },
+        {
+            "name": "finish_trigger",
+            "periodic": {
+                "period_ms": 2000
+            }
+        }
+    ],
+    "start_trigger_name": "start_trigger",
+    "stop_trigger_name": "end_trigger",
+    "deactivate_trigger_name": "finish_trigger",
+    "data_sources": [
+        {
+            "name": "data_source",
+            "source_identifier": ".google.sdv.telemetry_samples.LifecycleTriggers"
+        }
+    ],
+    "aggregators": [
+        {
+            "name": "aggregator",
+            "trigger_names": [
+                "data_trigger"
+            ],
+            "message_builder": {
+                "field_assignments": [
+                    {
+                        "field_name": "value",
+                        "aggregation": {
+                            "@type": "vector",
+                            "expression": "data_source.integer"
+                        }
+                    }
+                ]
+            }
+        }
+    ],
+    "report_configs": [
+        {
+            "name": "report",
+            "trigger_names": [],
+            "report_incomplete": true,
+            "message_builder": {
+                "field_assignments": [
+                    {
+                        "field_name": "value",
+                        "aggregation": {
+                            "@type": "none",
+                            "expression": "aggregator.value"
+                        }
+                    }
+                ]
+            }
+        }
+    ],
+    "vehicle_signals": "Cm8KGGxpZmVjeWNsZV90cmlnZ2Vycy5wcm90bxIcZ29vZ2xlLnNkdi50ZWxlbWV0cnlfc2FtcGxlcyItChFMaWZlY3ljbGVUcmlnZ2VycxIYCgdpbnRlZ2VyGAEgASgFUgdpbnRlZ2VyYgZwcm90bzM="
+}

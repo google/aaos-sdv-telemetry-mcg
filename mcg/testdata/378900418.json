@@ -1,0 +1,69 @@
+{
+  "aggregators": [
+    {
+      "name": "tmstmp_name_2aea64f3_c334_43af_a799_584f22f4d4f0",
+      "reset_on_get": false,
+      "trigger_names": [
+        "some_trigger"
+      ],
+      "message_builder": {
+        "field_assignments": [
+          {
+            "field_name": "timestamp",
+            "aggregation": {
+              "@type": "none",
+              "expression": "timestamp(REALTIME_CLOCK)"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "pub_name_4bf24dac_473a_46a9_a3b0_4ecdec022569",
+      "reset_on_get": false,
+      "trigger_names": [
+        "some_trigger"
+      ],
+      "message_builder": {
+        "field_assignments": [
+          {
+            "field_name": "data",
+            "aggregation": {
+              "@type": "none",
+              "expression": "tmstmp_name_2aea64f3_c334_43af_a799_584f22f4d4f0.timestamp - tmstmp_name_081cff19_f150_4b62_aaad_6ddc40074cdd.timestamp"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "tmstmp_name_081cff19_f150_4b62_aaad_6ddc40074cdd",
+      "reset_on_get": false,
+      "trigger_names": [
+        "some_trigger"
+      ],
+      "message_builder": {
+        "field_assignments": [
+          {
+            "field_name": "timestamp",
+            "aggregation": {
+              "@type": "none",
+              "expression": "timestamp(REALTIME_CLOCK)"
+            }
+          }
+        ]
+      }
+    }
+  ],
+  "triggers": [
+    {
+      "name": "some_trigger",
+      "periodic": {
+        "period_ms": 1200
+      }
+    }
+  ],
+  "stop_trigger_name": "some_trigger",
+  "start_trigger_name": "some_trigger",
+  "report_configs": []
+}

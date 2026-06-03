@@ -1,0 +1,107 @@
+// Copyright 2023 Google LLC
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+// Defines a schema for Vehicle Services IDL (VSIDL)
+
+// WARNING: This is an experimental API and not expected to be stable or final.
+//          Content of the file might drastically change with further
+//          development iterations.
+
+syntax = "proto3";
+
+import "google/protobuf/descriptor.proto";
+import "mcg/testdata/vehicle_signals_sample/sdv_protos/syntax/someip.proto";
+import "mcg/testdata/vehicle_signals_sample/sdv_protos/syntax/diagnostics.proto";
+
+package sdv.vsidl;
+
+message Topic {
+  // Defines publisher model with the compile time checks.
+  enum PublisherModel {
+    // One publisher is allowed to be defined for the topic [default].
+    SINGLE_PUB = 0;
+    // Several publishers are allowed to be defined for the topic.
+    MULTI_PUB = 1;
+  }
+  oneof type {
+    // Name of an enum representing topics
+    string typed_name = 1;
+    // A message corresponds to a single topic identified by a message name
+    bool unique = 2;
+  }
+  // Publisher model allows to define several publishers for the same topic.
+  // TODO(b/300216000): the model is not implemented in the code generator.
+  PublisherModel model = 3;
+}
+
+// Google reserves custom options index values 50000-50999, in particular:
+// - Diagnostics: 50200-50210
+// OEMs could introduce own custom options with indexes 51000-99999
+extend google.protobuf.MessageOptions {
+  // Adds pub/sub topic with the underlying payload as a message the option
+  // defined for. Maximum message size is automatically calculated for the
+  // messages that are published to topics. This requires setting
+  // 'repeated_field_max_count' option for repeated fields and
+  // 'variable_type_max_size' for fields of variable size (string or bytes or
+  // message).
+  Topic topic = 50001;
+}
+
+extend google.protobuf.FieldOptions {
+  // Specifies maximum number of times repeated field could be present.
+  optional int32 repeated_field_max_count = 50050;
+  // Specifies maximum size of variable sized types (string/bytes/message) in
+  // bytes. For message type, the option is only required for the Protobuf
+  // well-known types that contain repeated or variable fields. If the option is
+  // specified for a message type, the value will be adopted even if the message
+  // contains only fields with fix-sized types.
+  optional int32 variable_type_max_size = 50051;
+}
+
+extend google.protobuf.EnumOptions {
+  // Should be set to true for enums which are used as `typed_name` to describe
+  // topics
+  bool is_topic = 50100;
+}
+
+// Defines an SDV service
+message Service {
+  // Service name w/o package - it is assigned to the package name defined in
+  // the file.
+  string name = 1;
+  // List of topics a service subscribes to.
+  repeated string subscriber = 2;
+  // List of topics a service publishes to.
+  repeated string publisher = 3;
+  // RPC interfaces offered by a service.
+  repeated string server = 4;
+  // RPC interfaces consumed by a service.
+  repeated string client = 5;
+  // Diagnostics declarations
+  DiagnosticsDeclaration diagnostics_declaration = 6;
+}
+
+// The root message for *.vsidl files
+message VsidlEntry {
+  // Package name for every entity mentioned in a file (eg service name, pubsub
+  // topic, rpc interface) which are reference by name only. Entities with full
+  // names
+  // (<package_name>.<entity_name>) are not affected by this field.
+  string package = 1;
+  // List of SDV Service Bundles - containers of RPC interfaces, publishers and
+  // subscribers.
+  repeated Service sdv_service_bundle = 2;
+  // SOMEIP mapping rules
+  repeated SomeIpMapping some_ip_mapping = 3;
+}

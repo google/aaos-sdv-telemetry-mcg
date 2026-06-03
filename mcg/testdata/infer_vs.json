@@ -1,0 +1,175 @@
+{
+  "triggers": [
+    {
+      "name": "periodic_5s",
+      "periodic": {
+        "period_ms": 5000
+      }
+    },
+    {
+      "name": "trip_state_trigger",
+      "data": {
+        "source_name": "trip_state_publisher"
+      }
+    },
+    {
+      "name": "trip_end",
+      "conditional": {
+        "triggers": [
+          "trip_state_trigger"
+        ],
+        "condition_type": {
+          "is_true": {}
+        },
+        "expression": "trip_state_publisher.trigger_value"
+      }
+    }
+  ],
+  "stop_trigger_name": "trip_end",
+  "start_trigger_name": "periodic_5s",
+  "data_sources": [
+    {
+      "name": "trip_state_publisher",
+      "source_identifier": ".mcg.test.subpkg.trigger_msg"
+    },
+    {
+      "name": "speed",
+      "source_identifier": ".mcg.test.car_speed_msg"
+    },
+    {
+      "name": "speed_report",
+      "source_identifier": ".mcg.test.report.speed_report"
+    }
+  ],
+  "aggregators": [
+    {
+      "name": "aggregations",
+      "trigger_names": [
+        "periodic_5s"
+      ],
+      "reset_on_get": true,
+      "message_builder": {
+        "field_assignments": [
+          {
+            "field_name": "none_meters_per_hour",
+            "aggregation": {
+              "@type": "none",
+              "expression": "speed.speed"
+            }
+          },
+          {
+            "field_name": "vector_meters_per_hour",
+            "aggregation": {
+              "@type": "vector",
+              "expression": "speed.speed"
+            }
+          },
+          {
+            "field_name": "max_meters_per_hour",
+            "aggregation": {
+              "@type": "max",
+              "expression": "speed.speed"
+            }
+          },
+          {
+            "field_name": "min_meters_per_hour",
+            "aggregation": {
+              "@type": "min",
+              "expression": "speed.sample_int"
+            }
+          },
+          {
+            "field_name": "avg_meters_per_hour",
+            "aggregation": {
+              "@type": "avg",
+              "expression": "speed.sample_int"
+            }
+          },
+          {
+            "field_name": "count_meters_per_hour",
+            "aggregation": {
+              "@type": "count"
+            }
+          },
+          {
+            "field_name": "sum_meters_per_hour",
+            "aggregation": {
+              "@type": "sum",
+              "expression": "speed.sample_int"
+            }
+          },
+          {
+            "field_name": "stddev_meters_per_hour",
+            "aggregation": {
+              "@type": "stddev",
+              "expression": "speed.sample_int"
+            }
+          },
+          {
+            "field_name": "delta_meters_per_hour",
+            "aggregation": {
+              "@type": "delta",
+              "expression": "speed.sample_int"
+            }
+          }
+        ]
+      }
+    }
+  ],
+  "report_configs": [
+    {
+      "name": "max_avg_cur",
+      "trigger_names": [
+        "trip_end"
+      ],
+      "report_incomplete": true,
+      "message_builder": {
+        "field_assignments": [
+          {
+            "field_name": "avg_meters_per_hour_rep",
+            "aggregation": {
+              "@type": "none",
+              "expression": "aggregations.avg_meters_per_hour  + 1"
+            }
+          },
+          {
+            "field_name": "max_meters_per_hour_rep",
+            "aggregation": {
+              "@type": "none",
+              "expression": "aggregations.max_meters_per_hour"
+            }
+          },
+          {
+            "field_name": "cur_meters_per_hour_rep",
+            "aggregation": {
+              "@type": "none",
+              "expression": "speed.sample_float"
+            }
+          },
+          {
+            "field_name": "min_meters_per_hour_rep",
+            "aggregation": {
+              "@type": "none",
+              "expression": "aggregations.min_meters_per_hour"
+            }
+          },
+          {
+            "field_name": "speed_msg_list",
+            "aggregation": {
+              "@type": "none",
+              "expression": "speed_report.car_speed_list.speed_msg"
+            }
+          },
+          {
+            "field_name": "speed_enum_field",
+            "aggregation": {
+              "@type": "none",
+              "expression": "speed.unit"
+            }
+          }
+        ]
+      }
+    }
+  ],
+  "vs_version": "1"
+}

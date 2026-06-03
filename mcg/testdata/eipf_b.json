@@ -1,0 +1,128 @@
+{
+  "triggers": [
+    {
+      "name": "periodic_5s",
+      "periodic": {
+        "period_ms": 5000
+      }
+    },
+    {
+      "name": "trip_state_trigger",
+      "data": {
+        "source_name": "trip_state_publisher"
+      }
+    },
+    {
+      "name": "trip_end",
+      "conditional": {
+        "triggers": [
+          "trip_state_trigger"
+        ],
+        "condition_type": {
+					"is_true": {}
+				},
+        "expression": "trip_state_publisher.trip_end"
+      }
+    }
+  ],
+  "stop_trigger_name": "trip_end",
+  "start_trigger_name": "periodic_5s",
+  "data_sources": [
+    {
+      "name": "trip_state_publisher",
+      "source_identifier": "TripState",
+      "sub_sampling_interval_ms": 1500
+    },
+    {
+      "name": "speed",
+      "source_identifier": "VehicleSpeedPublisher"
+    },
+    {
+      "name": "speed_with_config",
+      "source_identifier": "VehicleSpeedPublisher",
+      "configuration": {
+        "type_url": "type.example.com/VideoConfiguration",
+        "value": "CAE="
+      }
+    }
+  ],
+  "aggregators": [
+    {
+      "name": "max_meters_per_hour",
+      "trigger_names": [
+        "periodic_5s"
+      ],
+      "reset_on_get": true,
+      "message_builder": {
+        "message_type": ".google.protobuf.UInt32Value",
+        "field_assignments": [
+          {
+            "field_name": "value",
+            "aggregation": {
+              "@type": "max",
+              "expression": "speed.value"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "avg_meters_per_hour",
+      "trigger_names": [
+        "periodic_5s"
+      ],
+      "reset_on_get": true,
+      "message_builder": {
+        "message_type": ".google.protobuf.FloatValue",
+        "field_assignments": [
+          {
+            "field_name": "value",
+            "aggregation": {
+              "@type": "avg",
+              "expression": "speed.value"
+            }
+          }
+        ]
+      }
+    }
+  ],
+  "report_configs": [
+    {
+      "name": "max_avg_cur",
+      "trigger_names": [
+        "trip_end"
+      ],
+      "report_incomplete": true,
+      "message_builder": {
+        "message_type": ".android.sdv.telemetry.mcg.testdata.MaxAvgCur",
+        "field_assignments": [
+          {
+            "field_name": "avg_meters_per_hour",
+            "aggregation": {
+              "@type": "none",
+              "expression": "avg_meters_per_hour.value"
+            }
+          },
+          {
+            "field_name": "max_meters_per_hour",
+            "aggregation": {
+              "@type": "none",
+              "expression": "max_meters_per_hour.value"
+            }
+          },
+          {
+            "field_name": "cur_meters_per_hour",
+            "aggregation": {
+              "@type": "none",
+              "expression": "speed_with_config.value"
+            }
+          }
+        ]
+      }
+    }
+  ],
+  "descriptor_protos": [
+    "Cu8BCiZtY2cvdGVzdGRhdGEvbWF4YXZnY3VyL21heGF2Z2N1ci5wcm90bxIiYW5kcm9pZC5zZHYudGVsZW1ldHJ5Lm1jZy50ZXN0ZGF0YSKYAQoJTWF4QXZnQ3VyEi0KE21heF9tZXRlcnNfcGVyX2hvdXIYASABKA1SEG1heE1ldGVyc1BlckhvdXISLQoTY3VyX21ldGVyc19wZXJfaG91chgCIAEoDVIQY3VyTWV0ZXJzUGVySG91chItChNhdmdfbWV0ZXJzX3Blcl9ob3VyGAMgASgCUhBhdmdNZXRlcnNQZXJIb3VyYgZwcm90bzMKgwEKMG1jZy90ZXN0ZGF0YS9wcm90bzJfZXhhbXBsZS9wcm90bzJfZXhhbXBsZS5wcm90bxIiYW5kcm9pZC5zZHYudGVsZW1ldHJ5Lm1jZy50ZXN0ZGF0YSIrChFTb21lUHJvdG8yTWVzc2FnZRIWCgZsYWxhbGEYASABKAJSBmxhbGFsYQ=="
+  ],
+  "vehicle_signals": "Cu8BCiZtY2cvdGVzdGRhdGEvbWF4YXZnY3VyL21heGF2Z2N1ci5wcm90bxIiYW5kcm9pZC5zZHYudGVsZW1ldHJ5Lm1jZy50ZXN0ZGF0YSKYAQoJTWF4QXZnQ3VyEi0KE21heF9tZXRlcnNfcGVyX2hvdXIYASABKA1SEG1heE1ldGVyc1BlckhvdXISLQoTY3VyX21ldGVyc19wZXJfaG91chgCIAEoDVIQY3VyTWV0ZXJzUGVySG91chItChNhdmdfbWV0ZXJzX3Blcl9ob3VyGAMgASgCUhBhdmdNZXRlcnNQZXJIb3VyYgZwcm90bzMKgwEKMG1jZy90ZXN0ZGF0YS9wcm90bzJfZXhhbXBsZS9wcm90bzJfZXhhbXBsZS5wcm90bxIiYW5kcm9pZC5zZHYudGVsZW1ldHJ5Lm1jZy50ZXN0ZGF0YSIrChFTb21lUHJvdG8yTWVzc2FnZRIWCgZsYWxhbGEYASABKAJSBmxhbGFsYQ=="
+}

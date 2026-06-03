@@ -1,0 +1,37 @@
+{
+  "existing_uuid": "ffb6e2ed-93d9-4fb6-b182-d0582f86764f",
+  "triggers": [
+    {
+      "name": "data_trigger",
+      "data": {
+        "source_name": "data_publisher"
+      }
+    }
+  ],
+
+  "data_sources": [
+    {
+      "name": "data_publisher",
+      "source_identifier": ".google.sdv.telemetry_samples.WrappedMessage"
+    }
+  ],
+
+  "report_configs": [
+    {
+      "name": "message_report",
+      "trigger_names": ["data_trigger"],
+      "message_builder": {
+        "field_assignments": [
+          {
+            "field_name": "message_field",
+            "aggregation": {
+              "@type": "none",
+              "expression": "data_publisher.message"
+            }
+          }
+        ]
+      }
+    }
+  ],
+  "vehicle_signals": "CvQBCg1tZXNzYWdlLnByb3RvEhxnb29nbGUuc2R2LnRlbGVtZXRyeV9zYW1wbGVzImoKB01lc3NhZ2USGwoJaW50X3ZhbHVlGAEgASgFUghpbnRWYWx1ZRIfCgtmbG9hdF92YWx1ZRgCIAEoAlIKZmxvYXRWYWx1ZRIhCgxzdHJpbmdfdmFsdWUYAyABKAlSC3N0cmluZ1ZhbHVlIlEKDldyYXBwZWRNZXNzYWdlEj8KB21lc3NhZ2UYASABKAsyJS5nb29nbGUuc2R2LnRlbGVtZXRyeV9zYW1wbGVzLk1lc3NhZ2VSB21lc3NhZ2ViBnByb3RvMw=="
+}

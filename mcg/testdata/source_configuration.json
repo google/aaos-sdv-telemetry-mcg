@@ -1,0 +1,108 @@
+{
+  "data_sources": [
+    {
+      "name": "simple_binary",
+      "source_identifier": "ServiceName",
+      "configuration": {
+        "type_url": "type.googleapis.com/google.protobuf.UInt32Value",
+        "value": "CHs="
+      }
+    },
+    {
+      "name": "simple_textproto",
+      "source_identifier": "ServiceName",
+      "configuration": {
+        "type_url": "type.googleapis.com/google.protobuf.UInt32Value",
+        "value_textproto": "value: 7"
+      }
+    },
+    {
+      "name": "simple_json",
+      "source_identifier": "ServiceName",
+      "configuration": {
+        "type_url": "type.googleapis.com/google.protobuf.UInt32Value",
+        "value_json": 123
+      }
+    },
+    {
+      "name": "empty_value_binary",
+      "source_identifier": "ServiceName",
+      "configuration": {
+        "type_url": "type.googleapis.com/google.protobuf.UInt32Value",
+        "value": ""
+      }
+    },
+    {
+      "name": "empty_value_textproto",
+      "source_identifier": "ServiceName",
+      "configuration": {
+        "type_url": "type.googleapis.com/google.protobuf.UInt32Value",
+        "value_textproto": ""
+      }
+    },
+    {
+      "name": "empty_value_json",
+      "source_identifier": "ServiceName",
+      "configuration": {
+        "type_url": "type.googleapis.com/google.protobuf.UInt32Value",
+        "value_json": 0
+      }
+    },
+    {
+      "name": "message_vehicle_signals_binary",
+      "source_identifier": "ServiceName",
+      "configuration": {
+        "type_url": "type.googleapis.com/android.sdv.telemetry.mcg.testdata.SomeProto2Message",
+        "value": "DTMz80A="
+      }
+    },
+    {
+      "name": "message_vehicle_signals_textproto",
+      "source_identifier": "ServiceName",
+      "configuration": {
+        "type_url": "type.googleapis.com/android.sdv.telemetry.mcg.testdata.SomeProto2Message",
+        "value_textproto": "lalala: 7.6"
+      }
+    },
+    {
+      "name": "message_vehicle_signals_json",
+      "source_identifier": "ServiceName",
+      "configuration": {
+        "type_url": "type.googleapis.com/android.sdv.telemetry.mcg.testdata.SomeProto2Message",
+        "value_json": {
+          "lalala": 7.6
+        }
+      }
+    },
+    {
+      "name": "message_descriptor_protos_binary",
+      "source_identifier": "ServiceName",
+      "configuration": {
+        "type_url": "type.googleapis.com/android.sdv.telemetry.mcg.testdata.MaxAvgCur",
+        "value": "CAM="
+      }
+    },
+    {
+      "name": "message_descriptor_protos_textproto",
+      "source_identifier": "ServiceName",
+      "configuration": {
+        "type_url": "type.googleapis.com/android.sdv.telemetry.mcg.testdata.MaxAvgCur",
+        "value_textproto": "max_meters_per_hour: 3"
+      }
+    },
+    {
+      "name": "message_descriptor_protos_json",
+      "source_identifier": "ServiceName",
+      "configuration": {
+        "type_url": "type.googleapis.com/android.sdv.telemetry.mcg.testdata.MaxAvgCur",
+        "value_json": {
+          "max_meters_per_hour": 3
+        }
+      }
+    }
+  ],
+  "vehicle_signals": "Cu8BCiZtY2cvdGVzdGRhdGEvbWF4YXZnY3VyL21heGF2Z2N1ci5wcm90bxIiYW5kcm9pZC5zZHYudGVsZW1ldHJ5Lm1jZy50ZXN0ZGF0YSKYAQoJTWF4QXZnQ3VyEi0KE21heF9tZXRlcnNfcGVyX2hvdXIYASABKA1SEG1heE1ldGVyc1BlckhvdXISLQoTY3VyX21ldGVyc19wZXJfaG91chgCIAEoDVIQY3VyTWV0ZXJzUGVySG91chItChNhdmdfbWV0ZXJzX3Blcl9ob3VyGAMgASgCUhBhdmdNZXRlcnNQZXJIb3VyYgZwcm90bzM=",
+  "descriptor_protos": [
+    "CoMBCjBtY2cvdGVzdGRhdGEvcHJvdG8yX2V4YW1wbGUvcHJvdG8yX2V4YW1wbGUucHJvdG8SImFuZHJvaWQuc2R2LnRlbGVtZXRyeS5tY2cudGVzdGRhdGEiKwoRU29tZVByb3RvMk1lc3NhZ2USFgoGbGFsYWxhGAEgASgCUgZsYWxhbGE="
+  ]
+}

@@ -1,0 +1,44 @@
+// Copyright 2026 Google LLC
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+syntax = "proto3";
+
+package input_descriptors.message;
+
+import "google/protobuf/timestamp.proto";
+import "mcg/testdata/input_descriptors_sample/circular.proto";
+
+message Message {
+    string metric_id = 1;
+    google.protobuf.Timestamp timestamp = 2;
+    input_descriptors.circular.MessageA circular_data = 3;
+
+    // Message definition nested inside another message definition.
+    message NestedMessage {
+        // Enum definition nested inside another nested message definition.
+        enum NestedEnum {
+            ONE = 0;
+            TWO = 1;
+            THREE = 2;
+        }
+        NestedEnum nested_enum_field = 1;
+        string nested_string_field = 2;
+    }
+    NestedMessage nested_message = 4;
+}
+
+// Unused message definition to validate unreferenced type pruning (DEP-02).
+message UnusedMessage {
+    string unused_field = 1;
+}

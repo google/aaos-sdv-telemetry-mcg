@@ -1,0 +1,50 @@
+{
+  "data_sources": [
+    {
+      "name": "data_source",
+      "source_identifier": "google.protobuf.Int32Value",
+      "connection_type": "ON_DEMAND"
+    },
+    {
+      "name": "data_source_2",
+      "source_identifier": "google.protobuf.Int32Value"
+    }
+  ],
+  "aggregators": [
+    {
+      "name": "aggregator",
+      "trigger_names": ["periodic_trigger"],
+      "message_builder": {
+        "field_assignments": [
+          {
+            "field_name": "field",
+            "aggregation": {
+              "@type": "none",
+              "expression": "data_source.value"
+            }
+          }
+        ]
+      }
+    }
+  ],
+  "triggers": [
+    {
+      "name": "data_trigger",
+      "data": {
+        "source_name": "data_source_2"
+      }
+    },
+    {
+      "name": "periodic_trigger",
+      "periodic": {
+        "period_ms": 1000
+      }
+    }
+  ],
+  "start_trigger_name": "periodic_trigger",
+  "stop_trigger_name": "data_trigger",
+  "deactivate_trigger_name": "data_trigger",
+  "data_source_message_types": {
+    "google.protobuf.Int32Value": "google.protobuf.Int32Value"
+  }
+}

@@ -1,0 +1,250 @@
+{
+  "triggers": [
+    {
+      "name": "parent_trigger",
+      "periodic": { "period_ms": 1200 }
+    },
+    {
+      "name": "is_true",
+      "conditional": {
+        "triggers": ["parent_trigger"],
+        "condition_type": {
+          "is_true": {}
+        },
+        "expression": "true"
+      }
+    },
+    {
+      "name": "is_false",
+      "conditional": {
+        "triggers": ["parent_trigger"],
+        "condition_type": {
+          "is_false": {}
+        },
+        "expression": "true"
+      }
+    },
+    {
+      "name": "rising_edge",
+      "conditional": {
+        "triggers": ["parent_trigger"],
+        "condition_type": {
+          "rising_edge": {}
+        },
+        "expression": "true"
+      }
+    },
+    {
+      "name": "rising_edge_empty_edge_options",
+      "conditional": {
+        "triggers": ["parent_trigger"],
+        "condition_type": {
+          "rising_edge": {
+            "rising_options": {}
+          }
+        },
+        "expression": "true"
+      }
+    },
+    {
+      "name": "rising_edge_edge_options_1",
+      "conditional": {
+        "triggers": ["parent_trigger"],
+        "condition_type": {
+          "rising_edge": {
+            "rising_options": {
+              "min_duration_ms": 123
+            }
+          }
+        },
+        "expression": "true"
+      }
+    },
+    {
+      "name": "rising_edge_edge_options_2",
+      "conditional": {
+        "triggers": ["parent_trigger"],
+        "condition_type": {
+          "rising_edge": {
+            "rising_options": {
+              "min_duration_ms": 123,
+              "require_exact": true
+            }
+          }
+        },
+        "expression": "true"
+      }
+    },
+    {
+      "name": "falling_edge",
+      "conditional": {
+        "triggers": ["parent_trigger"],
+        "condition_type": {
+          "falling_edge": {}
+        },
+        "expression": "true"
+      }
+    },
+    {
+      "name": "falling_edge_empty_edge_options",
+      "conditional": {
+        "triggers": ["parent_trigger"],
+        "condition_type": {
+          "falling_edge": {
+            "falling_options": {}
+          }
+        },
+        "expression": "true"
+      }
+    },
+    {
+      "name": "falling_edge_edge_options_1",
+      "conditional": {
+        "triggers": ["parent_trigger"],
+        "condition_type": {
+          "falling_edge": {
+            "falling_options": {
+              "min_duration_ms": 123
+            }
+          }
+        },
+        "expression": "true"
+      }
+    },
+    {
+      "name": "falling_edge_edge_options_2",
+      "conditional": {
+        "triggers": ["parent_trigger"],
+        "condition_type": {
+          "falling_edge": {
+            "falling_options": {
+              "min_duration_ms": 123,
+              "require_exact": true
+            }
+          }
+        },
+        "expression": "true"
+      }
+    },
+    {
+      "name": "all_changes",
+      "conditional": {
+        "triggers": ["parent_trigger"],
+        "condition_type": {
+          "all_changes": {}
+        },
+        "expression": "true"
+      }
+    },
+    {
+      "name": "all_changes_empty_edge_options",
+      "conditional": {
+        "triggers": ["parent_trigger"],
+        "condition_type": {
+          "all_changes": {
+            "rising_options": {},
+            "falling_options": {}
+          }
+        },
+        "expression": "true"
+      }
+    },
+    {
+      "name": "all_changes_edge_options_1",
+      "conditional": {
+        "triggers": ["parent_trigger"],
+        "condition_type": {
+          "all_changes": {
+            "rising_options": {
+              "min_duration_ms": 123
+            }
+          }
+        },
+        "expression": "true"
+      }
+    },
+    {
+      "name": "all_changes_edge_options_2",
+      "conditional": {
+        "triggers": ["parent_trigger"],
+        "condition_type": {
+          "all_changes": {
+            "rising_options": {
+              "min_duration_ms": 123,
+              "require_exact": true
+            }
+          }
+        },
+        "expression": "true"
+      }
+    },
+    {
+      "name": "all_changes_edge_options_3",
+      "conditional": {
+        "triggers": ["parent_trigger"],
+        "condition_type": {
+          "all_changes": {
+            "falling_options": {
+              "min_duration_ms": 123
+            }
+          }
+        },
+        "expression": "true"
+      }
+    },
+    {
+      "name": "all_changes_edge_options_4",
+      "conditional": {
+        "triggers": ["parent_trigger"],
+        "condition_type": {
+          "all_changes": {
+            "falling_options": {
+              "min_duration_ms": 123,
+              "require_exact": true
+            }
+          }
+        },
+        "expression": "true"
+      }
+    },
+    {
+      "name": "all_changes_edge_options_5",
+      "conditional": {
+        "triggers": ["parent_trigger"],
+        "condition_type": {
+          "all_changes": {
+            "rising_options": {
+              "min_duration_ms": 123
+            },
+            "falling_options": {
+              "min_duration_ms": 456
+            }
+          }
+        },
+        "expression": "true"
+      }
+    },
+    {
+      "name": "all_changes_edge_options_6",
+      "conditional": {
+        "triggers": ["parent_trigger"],
+        "condition_type": {
+          "all_changes": {
+            "rising_options": {
+              "min_duration_ms": 123,
+              "require_exact": false
+            },
+            "falling_options": {
+              "min_duration_ms": 456,
+              "require_exact": true
+            }
+          }
+        },
+        "expression": "true"
+      }
+    }
+  ],
+  "stop_trigger_name": "parent_trigger",
+  "start_trigger_name": "parent_trigger",
+  "report_configs": []
+}

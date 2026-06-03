@@ -1,0 +1,1093 @@
+# Copyright 2025 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+openapi: 3.0.1
+info:
+  title: Metrics Config Generator
+  description: Generate MetricsConfig for the SDV Telemetry Service
+  contact:
+    name: Android SDV Telemetry
+    email: aaos-sdv-telemetry-external@google.com
+  version: "<<<REPLACED DURING BUILD>>>"
+servers:
+- url: '{url}'
+  variables:
+    url:
+      default: "/"
+      description: The base URL of MCG (use `/` for the current URL).
+paths:
+  /api/v1/generate_metrics_config:
+    post:
+      description: Create a metrics config from one large request
+      parameters:
+      - name: ignore_validation
+        in: query
+        description: Ignore any validation errors and return the metrics config anyways
+        required: false
+        style: form
+        explode: true
+        schema:
+          type: boolean
+      requestBody:
+        description: Metrics config request
+        content:
+          '*/*':
+            schema:
+              $ref: "#/components/schemas/requests.MetricsConfigRequestV1"
+        required: true
+      responses:
+        "200":
+          description: Metrics configuration
+          headers:
+            Metrics-Config-Size:
+              description: Size of the MetricsConfiguration in binary format in Bytes
+              style: simple
+              explode: false
+              schema:
+                type: string
+          content:
+            application/x-protobuf;proto=android.sdv.telemetry.MetricsConfig:
+              schema:
+                type: object
+            text/x-protobuf;proto=android.sdv.telemetry.MetricsConfig:
+              schema:
+                type: object
+                description: Legacy textproto format
+        "400":
+          description: "INVALID_ARGUMENT: Various data validation errors"
+          content:
+            application/x-protobuf;proto=android.sdv.telemetry.MetricsConfig:
+              schema:
+                $ref: "#/components/schemas/errors.JsonErrorResponse"
+            text/x-protobuf;proto=android.sdv.telemetry.MetricsConfig:
+              schema:
+                $ref: "#/components/schemas/errors.JsonErrorResponse"
+        "500":
+          description: "INTERNAL: Internal errors"
+          content:
+            application/x-protobuf;proto=android.sdv.telemetry.MetricsConfig:
+              schema:
+                $ref: "#/components/schemas/errors.JsonErrorResponse"
+            text/x-protobuf;proto=android.sdv.telemetry.MetricsConfig:
+              schema:
+                $ref: "#/components/schemas/errors.JsonErrorResponse"
+      x-codegen-request-body-name: body
+  /api/v1/get_file_descriptor_set:
+    post:
+      description: Returns FileDescriptors for a given MetricsConfiguration
+      requestBody:
+        description: Metrics config textproto
+        content:
+          application/x-protobuf;proto=android.sdv.telemetry.MetricsConfig:
+            schema:
+              type: string
+          text/x-protobuf;proto=android.sdv.telemetry.MetricsConfig:
+            schema:
+              type: string
+              description: Legacy textproto format
+        required: false
+      responses:
+        "200":
+          description: FileDescriptorSet
+          content:
+            application/x-protobuf;google.protobuf.FileDescriptorSet:
+              schema:
+                type: object
+            text/x-protobuf;proto=google.protobuf.FileDescriptorSet:
+              schema:
+                type: object
+        "400":
+          description: "INVALID_ARGUMENT: Invalid Metrics config."
+          content:
+            application/x-protobuf;google.protobuf.FileDescriptorSet:
+              schema:
+                $ref: "#/components/schemas/errors.JsonErrorResponse"
+            text/x-protobuf;proto=google.protobuf.FileDescriptorSet:
+              schema:
+                $ref: "#/components/schemas/errors.JsonErrorResponse"
+  /api/v1/validate_metrics_config:
+    post:
+      description: Validate the passed metrics config. Returns a list of validation
+        errors in case any.
+      parameters:
+      - name: return_config
+        in: query
+        description: Return MetricsConfig on successful validation
+        required: false
+        style: form
+        explode: true
+        schema:
+          type: boolean
+      requestBody:
+        description: Metrics config textproto
+        content:
+          application/x-protobuf;proto=android.sdv.telemetry.MetricsConfig:
+            schema:
+              type: string
+          text/x-protobuf;proto=android.sdv.telemetry.MetricsConfig:
+            schema:
+              type: string
+              description: Legacy textproto format
+        required: false
+      responses:
+        "200":
+          description: Empty object (default) or Metrics Configuration (for return_config=true)
+          headers:
+            Metrics-Config-Size:
+              description: Size of the MetricsConfiguration in binary format in Bytes
+              style: simple
+              explode: false
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                type: object
+        "400":
+          description: "INVALID_ARGUMENT: Metrics config validation failed."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/errors.JsonErrorResponse"
+      x-codegen-request-body-name: body
+  /api/v1/version:
+    get:
+      tags:
+      - v1 — Metadata
+      description: Query MCG version information
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/mcg.VersionInfo"
+  /api/v1/vs/:
+    get:
+      tags:
+      - v1 — Vehicle Signal Catalog metadata
+      description: List all Vehicle Signal Catalog metadata
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/signal_versions.VSCatalogVersionsMetadata"
+        "400":
+          description: Cache configuration errors
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/errors.JsonErrorResponse"
+    post:
+      tags:
+      - v1 — Vehicle Signal Catalogs
+      description: Create new or update existing Vehicle Signal Catalog
+      requestBody:
+        description: VSCatalogVersion
+        content:
+          '*/*':
+            schema:
+              $ref: "#/components/schemas/signal_versions.VSCatalogVersion"
+        required: false
+      responses:
+        "200":
+          description: Vehicle Signal Catalog added/updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/signal_versions.VSCatalogVersionMetadata"
+        "400":
+          description: Cache configuration or Invalid Request errors
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/errors.JsonErrorResponse"
+      x-codegen-request-body-name: body
+  /api/v1/vs/{version}:
+    delete:
+      tags:
+      - v1 — Vehicle Signal Catalogs
+      description: Delete Vehicle Signal Catalog
+      parameters:
+      - name: version
+        in: path
+        description: Vendor-defined identifier of the Vehicle Signal Catalog to delete
+        required: true
+        style: simple
+        explode: false
+        schema:
+          type: string
+      responses:
+        "200":
+          description: Vehicle Signal Catalog deleted successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/signal_versions.VSCatalogVersionMetadata"
+        "400":
+          description: Cache configuration or Invalid Request errors
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/errors.JsonErrorResponse"
+        "404":
+          description: Vehicle Signal Catalog not found
+          content:
+            application/json:
+              schema:
+                type: object
+  /api/v2/generate_metrics_config:
+    post:
+      description: Create a metrics config from one large request
+      parameters:
+      - name: ignore_validation
+        in: query
+        description: Ignore any validation errors and return the metrics config anyways
+        required: false
+        style: form
+        explode: true
+        schema:
+          type: boolean
+      requestBody:
+        description: Metrics config request
+        content:
+          '*/*':
+            schema:
+              $ref: "#/components/schemas/requests.MetricsConfigRequest"
+        required: true
+      responses:
+        "200":
+          description: Metrics configuration
+          headers:
+            Metrics-Config-Size:
+              description: Size of the MetricsConfiguration in binary format in Bytes
+              style: simple
+              explode: false
+              schema:
+                type: string
+          content:
+            application/x-protobuf;proto=android.sdv.telemetry.MetricsConfig:
+              schema:
+                type: object
+            text/x-protobuf;proto=android.sdv.telemetry.MetricsConfig:
+              schema:
+                type: object
+        "400":
+          description: "INVALID_ARGUMENT: Various data validation errors"
+          content:
+            application/x-protobuf;proto=android.sdv.telemetry.MetricsConfig:
+              schema:
+                $ref: "#/components/schemas/errors.JsonErrorResponse"
+            text/x-protobuf;proto=android.sdv.telemetry.MetricsConfig:
+              schema:
+                $ref: "#/components/schemas/errors.JsonErrorResponse"
+        "500":
+          description: "INTERNAL: Internal errors"
+          content:
+            application/x-protobuf;proto=android.sdv.telemetry.MetricsConfig:
+              schema:
+                $ref: "#/components/schemas/errors.JsonErrorResponse"
+            text/x-protobuf;proto=android.sdv.telemetry.MetricsConfig:
+              schema:
+                $ref: "#/components/schemas/errors.JsonErrorResponse"
+      x-codegen-request-body-name: body
+  /api/v2/get_file_descriptor_set:
+    post:
+      description: Returns FileDescriptors for a given MetricsConfiguration
+      responses:
+        "200":
+          description: FileDescriptorSet
+          content:
+            application/x-protobuf;google.protobuf.FileDescriptorSet:
+              schema:
+                type: object
+            text/x-protobuf;proto=google.protobuf.FileDescriptorSet:
+              schema:
+                type: object
+        "400":
+          description: "INVALID_ARGUMENT: Invalid Metrics config."
+          content:
+            application/x-protobuf;google.protobuf.FileDescriptorSet:
+              schema:
+                $ref: "#/components/schemas/errors.JsonErrorResponse"
+            text/x-protobuf;proto=google.protobuf.FileDescriptorSet:
+              schema:
+                $ref: "#/components/schemas/errors.JsonErrorResponse"
+  /api/v2/validate_metrics_config:
+    post:
+      description: Validate the passed metrics config. Returns a list of validation
+        errors in case any.
+      parameters:
+      - name: return_config
+        in: query
+        description: Return MetricsConfig on successful validation
+        required: false
+        style: form
+        explode: true
+        schema:
+          type: boolean
+      requestBody:
+        description: Metrics config textproto
+        content:
+          application/x-protobuf;proto=android.sdv.telemetry.MetricsConfig:
+            schema:
+              type: string
+          text/x-protobuf;proto=android.sdv.telemetry.MetricsConfig:
+            schema:
+              type: string
+        required: false
+      responses:
+        "200":
+          description: Empty object (default) or Metrics Configuration (for return_config=true)
+          headers:
+            Metrics-Config-Size:
+              description: Size of the MetricsConfiguration in binary format in Bytes
+              style: simple
+              explode: false
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                type: object
+        "400":
+          description: "INVALID_ARGUMENT: Metrics config validation failed."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/errors.JsonErrorResponse"
+      x-codegen-request-body-name: body
+  /api/v2/version:
+    get:
+      tags:
+      - v2 — Metadata
+      description: Query MCG version information
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/mcg.VersionInfo"
+  /api/v2/vs/:
+    get:
+      tags:
+      - v2 — Vehicle Signal Catalog metadata
+      description: List all Vehicle Signal Catalog metadata
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/signal_versions.VSCatalogVersionsMetadata"
+        "400":
+          description: Cache configuration errors
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/errors.JsonErrorResponse"
+    post:
+      tags:
+      - v2 — Vehicle Signal Catalogs
+      description: Create new or update existing Vehicle Signal Catalog
+      requestBody:
+        description: VSCatalogVersion
+        content:
+          '*/*':
+            schema:
+              $ref: "#/components/schemas/signal_versions.VSCatalogVersion"
+        required: false
+      responses:
+        "200":
+          description: Vehicle Signal Catalog added/updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/signal_versions.VSCatalogVersionMetadata"
+        "400":
+          description: Cache configuration or Invalid Request errors
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/errors.JsonErrorResponse"
+      x-codegen-request-body-name: body
+  /api/v2/vs/{version}:
+    delete:
+      tags:
+      - v2 — Vehicle Signal Catalogs
+      description: Delete Vehicle Signal Catalog
+      parameters:
+      - name: version
+        in: path
+        description: Vendor-defined identifier of the Vehicle Signal Catalog to delete
+        required: true
+        style: simple
+        explode: false
+        schema:
+          type: string
+      responses:
+        "200":
+          description: Vehicle Signal Catalog deleted successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/signal_versions.VSCatalogVersionMetadata"
+        "400":
+          description: Cache configuration or Invalid Request errors
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/errors.JsonErrorResponse"
+        "404":
+          description: Vehicle Signal Catalog not found
+          content:
+            application/json:
+              schema:
+                type: object
+  /health:
+    get:
+      description: Check the service's health
+      responses:
+        "200":
+          description: Service is healthy
+          content:
+            text/plain:
+              schema:
+                type: string
+components:
+  schemas:
+    errors.JsonErrorResponse:
+      type: object
+      properties:
+        error:
+          $ref: "#/components/schemas/errors.JsonErrorResponse_error"
+    mcg.VersionInfo:
+      type: object
+      properties:
+        service_version:
+          type: string
+          description: Service version
+          example: 1.2.3
+      description: MCG version information
+    requests.DataSourceRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          description: A user-defined string that identifies this data source.
+        source_identifier:
+          type: string
+          description: |-
+            The identifier used to discover the service.
+            Accepted formats:
+            - Unit Type Name (VSIDL): "package.FullyQualifiedProtoName" or "package.FullyQualifiedProtoName|ServiceUnitName"
+            - Configurable Registry Publishers: The exact serviceName.
+            - FQIN with Service Unit Name: "FQIN|ServiceUnitName"
+        connection_type:
+          type: string
+          description: |-
+            - SUBSCRIPTION: Continuous data stream. Required for data triggers.
+            - ON_DEMAND: On-demand fetching.
+          enum: ['SUBSCRIPTION', 'ON_DEMAND']
+        configuration:
+          $ref: '#/components/schemas/requests.DataSourceConfigurationRequest'
+        sub_sampling_interval_ms:
+          type: integer
+          format: int64
+        fetch_last_message:
+          type: boolean
+    ExpressionSyntax:
+      type: string
+      description: |-
+        The expression to evaluate. Expressions can express arithmetic calculations, logical conditions, and data comparisons. Parentheses `()` can be used to force a specific order of operations.
+
+        **Syntax examples:**
+        - **Data access:** `source_name`, `source_name.field`, `source_name.field.subfield`
+        - **Arithmetic:** `+`, `-`, `*`, `/`, `%`, `**`
+        - **Logical:** `&&`, `||`, `!`, `^`
+        - **Relational:** `==`, `!=`, `<`, `<=`, `>`, `>=`
+        - **List:** `contains(list, item)`, `doesnotcontain(list, item)`, `alleq(list, value)`
+        - **Functions:** `timestamp(clock_type)`, `abs(n)`, `floor(n)`, `round(n)`, `ceil(n)`
+    requests.FireInitial:
+      type: boolean
+      description: |-
+        If true, this trigger fires unconditionally when evaluating its expression for the first time.
+
+        **Note:** If set to `true`, edge options (rising_options, falling_options) and
+        `initialize_expression` must not be set.
+    requests.InitializeExpression:
+      type: string
+      description: |-
+        If set, initializes this trigger's state when it is activated. The expression result is then
+        used for comparison provided by the condition type when evaluating trigger's main expression
+        for the first time.
+
+        Follows the ExpressionSyntax rules.
+
+        **Note:** If set, edge options (rising_options, falling_options) and `fire_initial` flag
+        must not be set.
+    requests.AggregatorRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          description: A user-defined string that identifies this aggregator. Expressions can reference this aggregator by name to access its results.
+        trigger_names:
+          type: array
+          description: An array of one or more trigger names that cause this aggregation to be evaluated.
+          items:
+            type: string
+        reset_on_get:
+          type: boolean
+          description: If true, the system resets the aggregation state after its value is accessed by another aggregator, metrics report or conditional trigger.
+        message_builder:
+          $ref: '#/components/schemas/requests.MessageBuilderRequest'
+          description: Defines the data to read, process, and aggregate.
+
+    requests.AllChangesRequest:
+      type: object
+      properties:
+        falling_options:
+          $ref: "#/components/schemas/requests.EdgeOptionsRequest"
+        rising_options:
+          $ref: "#/components/schemas/requests.EdgeOptionsRequest"
+        fire_initial:
+          $ref: "#/components/schemas/requests.FireInitial"
+        initialize_expression:
+          $ref: "#/components/schemas/requests.InitializeExpression"
+    requests.ConditionTypeRequest:
+      type: object
+      properties:
+        all_changes:
+          $ref: "#/components/schemas/requests.AllChangesRequest"
+        falling_edge:
+          $ref: "#/components/schemas/requests.FallingEdgeRequest"
+        is_false:
+          type: object
+          properties: {}
+        is_true:
+          type: object
+          properties: {}
+        rising_edge:
+          $ref: "#/components/schemas/requests.RisingEdgeRequest"
+    requests.ConditionalTriggerRequest:
+      required:
+      - condition_type
+      - expression
+      - triggers
+      type: object
+      properties:
+        condition_type:
+          $ref: "#/components/schemas/requests.ConditionTypeRequest"
+        expression:
+          $ref: "#/components/schemas/ExpressionSyntax"
+        triggers:
+          uniqueItems: true
+          type: array
+          description: List of "parent" trigger names.
+          items:
+            type: string
+    requests.DataTriggerRequest:
+      required:
+      - source_name
+      type: object
+      properties:
+        source_name:
+          type: string
+          description: The name of the source that this trigger listens to.
+    requests.DataTriggerRequestV1:
+      required:
+      - publisher_name
+      type: object
+      properties:
+        publisher_name:
+          type: string
+          description: The name of the publisher that this trigger listens to.
+    requests.EdgeOptionsRequest:
+      required:
+      - min_duration_ms
+      type: object
+      properties:
+        min_duration_ms:
+          type: number
+          description: A non-negative number (in milliseconds) specifying how long the condition must hold in the new state before the trigger fires.
+        require_exact:
+          type: boolean
+          description: If true, all values published during the duration must be the same for the trigger to fire.
+    requests.FallingEdgeRequest:
+      type: object
+      properties:
+        falling_options:
+          $ref: "#/components/schemas/requests.EdgeOptionsRequest"
+        fire_initial:
+          $ref: "#/components/schemas/requests.FireInitial"
+        initialize_expression:
+          $ref: "#/components/schemas/requests.InitializeExpression"
+    requests.AggregationRequest:
+      type: object
+      required:
+      - "@type"
+      properties:
+        "@type":
+          type: string
+          enum:
+          - avg
+          - count
+          - min
+          - max
+          - sum
+          - stddev
+          - delta
+          - vector
+          - none
+          description: |-
+            The aggregation function.
+            - avg, min, max, sum, stddev: Standard math statistics.
+            - count: Counts how many times this aggregator has been triggered.
+            - delta: Difference between current and previous value.
+            - vector: Creates a list of values (ring buffer).
+            - none: Passes the raw value through.
+        expression:
+          $ref: "#/components/schemas/ExpressionSyntax"
+        max_length:
+          type: integer
+          description: For @type "vector" only. An optional integer that limits the vector size, creating a ring buffer.
+    requests.FieldAssignmentRequest:
+      type: object
+      properties:
+        aggregation:
+          $ref: "#/components/schemas/requests.AggregationRequest"
+        field_name:
+          type: string
+          description: A user-defined name for the field.
+        field_type:
+          type: string
+          description: "When message type inference is used, this field can be used\
+            \ to override the results of expression type inference."
+    requests.MessageBuilderRequest:
+      type: object
+      properties:
+        field_assignments:
+          type: array
+          items:
+            $ref: "#/components/schemas/requests.FieldAssignmentRequest"
+        message_type:
+          type: string
+          description: "If message_type is omitted, the message type inference feature\
+            \ will be used."
+    requests.DeprecatedDataSourceRequest:
+      type: object
+      properties:
+        service_name:
+          type: string
+        connection_type:
+          type: string
+        configuration:
+          $ref: '#/components/schemas/requests.DataSourceConfigurationRequest'
+        sub_sampling_interval_ms:
+          type: number
+        fetch_last_message:
+          type: boolean
+    requests.DeprecatedAggregatorRequest:
+      type: object
+      properties:
+        trigger_names:
+          type: array
+          items:
+            type: string
+        reset_on_get:
+          type: boolean
+        message_builder:
+          $ref: '#/components/schemas/requests.MessageBuilderRequest'
+    requests.DeprecatedSourceRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        service:
+          $ref: '#/components/schemas/requests.DeprecatedDataSourceRequest'
+        aggregation:
+          $ref: '#/components/schemas/requests.DeprecatedAggregatorRequest'
+    requests.MetricsConfigRequestV1:
+      type: object
+      properties:
+        descriptor_protos:
+          type: array
+          description: |-
+            An array of base64 encoded binary `descriptorpb.FileDescriptorSet`
+            defining additional descriptors needed for the MetricsConfig. When
+            inference is enabled, these schemas are parsed, structurally
+            optimized, tree-shaken and then added to the MetricsConfig. If
+            message inference is disabled, they are copied verbatim into the
+            resulting MetricsConfig without filtering.
+          items:
+            type: array
+            items:
+              type: integer
+              format: int32
+        existing_uuid:
+          type: string
+          description: Generate a metrics config with an existing UUID instead of
+            a random one.
+        publishers:
+          type: array
+          description: List of publishers (data sources or aggregators).
+          items:
+            $ref: '#/components/schemas/requests.DeprecatedSourceRequest'
+        end_trigger_name:
+          type: string
+          description: The name of a trigger that pauses the collection session.
+        finish_trigger_name:
+          type: string
+          description: The name of a trigger that finalizes and deactivates the metrics configuration.
+        report_configs:
+          type: array
+          items:
+            $ref: "#/components/schemas/requests.ReportConfigRequest"
+        service_type_hints:
+          type: object
+          description: |-
+            Map from source identifier to full protobuf message name.
+          additionalProperties:
+            type: string
+        start_trigger_name:
+          type: string
+        triggers:
+          type: array
+          items:
+            $ref: "#/components/schemas/requests.TriggerRequestV1"
+        vehicle_signals:
+          type: array
+          description: |-
+            A base64 encoded binary format of a `descriptorpb.FileDescriptorSet` containing VSIDL
+            annotations for vehicle signals. One `descriptorpb.FileDescriptorSet` (converted into one
+            byte array) can consist of multiple proto files depending on each other.
+
+            A base64 string: "CiBnb29nbGUvcHJvdG9idWY...Glvbg"
+          items:
+            type: integer
+            format: byte
+        vs_version:
+          type: string
+          description: |-
+            A string referencing a registered vehicle signal version. This value takes precedence over
+            `vehicle_signals` if both are set"
+          format: string
+        retain_aggregations_on_stop:
+          type: boolean
+          description: Specifies whether the aggregated values are reset (false) or retained (true) on end trigger.
+    requests.MetricsConfigRequest:
+      type: object
+      example:
+        existing_uuid: a1a2a3a4-b1b2-c1c2-d1d2-d3d4d5d6d7d8
+        vs_version: example_version
+        data_sources:
+          - name: SpeedSource
+            source_identifier: mcg.test.subpkg.speed_msg
+            connection_type: SUBSCRIPTION
+            sub_sampling_interval_ms: 1000
+        aggregators:
+          - name: SpeedAggregator
+            trigger_names:
+              - OnNewSpeed
+            reset_on_get: true
+            message_builder:
+              field_assignments:
+                - field_name: average_speed
+                  aggregation:
+                    '@type': avg
+                    expression: SpeedSource.speed
+                - field_name: speed_reading_count
+                  aggregation:
+                    '@type': count
+                - field_name: speed_history_last5
+                  aggregation:
+                    '@type': vector
+                    expression: SpeedSource.speed
+                    max_length: 5
+        triggers:
+          - name: OnNewSpeed
+            data:
+              source_name: SpeedSource
+          - name: EveryMinute
+            periodic:
+              period_ms: 60000
+        report_configs:
+          - name: MinuteReport
+            trigger_names:
+              - EveryMinute
+            message_builder:
+              field_assignments:
+                - field_name: average_speed
+                  aggregation:
+                    '@type': none
+                    expression: SpeedAggregator.average_speed
+                - field_name: reading_count
+                  aggregation:
+                    '@type': none
+                    expression: SpeedAggregator.speed_reading_count
+      properties:
+        descriptor_protos:
+          type: array
+          description: |-
+            An array of base64 encoded binary `descriptorpb.FileDescriptorSet`
+            defining additional descriptors needed for the MetricsConfig. When
+            inference is enabled, these schemas are parsed, structurally
+            optimized, tree-shaken and then added to the MetricsConfig. If
+            message inference is disabled, they are copied verbatim into the
+            resulting MetricsConfig without filtering.
+          items:
+            type: array
+            items:
+              type: integer
+              format: int32
+        existing_uuid:
+          type: string
+          description: Generate a metrics config with an existing UUID instead of
+            a random one.
+        data_sources:
+          type: array
+          description: List of data sources to collect data from.
+          items:
+            $ref: '#/components/schemas/requests.DataSourceRequest'
+        aggregators:
+          type: array
+          description: List of aggregators for stateful data processing.
+          items:
+            $ref: '#/components/schemas/requests.AggregatorRequest'
+        stop_trigger_name:
+          type: string
+          description: The name of a trigger that pauses the collection session. If set, start_trigger_name must also be set.
+        deactivate_trigger_name:
+          type: string
+          description: The name of a trigger that finalizes and deactivates the metrics configuration.
+        report_configs:
+          type: array
+          items:
+            $ref: "#/components/schemas/requests.ReportConfigRequest"
+        data_source_message_types:
+          type: object
+          description: |-
+            Map from source identifier to full protobuf message name.
+            If set for a data source, inference will not attempt to infer the message name from the source identifier, but instead use what's present in this map.
+          additionalProperties:
+            type: string
+        start_trigger_name:
+          type: string
+        triggers:
+          type: array
+          items:
+            $ref: "#/components/schemas/requests.TriggerRequest"
+        vehicle_signals:
+          type: array
+          description: |-
+            A base64 encoded binary format of a `descriptorpb.FileDescriptorSet` containing VSIDL
+            annotations for vehicle signals. One `descriptorpb.FileDescriptorSet` (converted into one
+            byte array) can consist of multiple proto files depending on each other.
+
+            A base64 string: "CiBnb29nbGUvcHJvdG9idWY...Glvbg"
+          items:
+            type: integer
+            format: byte
+        vs_version:
+          type: string
+          description: |-
+            A string referencing a registered vehicle signal version. This value takes precedence over
+            `vehicle_signals` if both are set"
+          format: string
+        retain_aggregations_on_stop:
+          type: boolean
+          description: Specifies whether the aggregated values are reset (false) or retained (true) on stop trigger.
+    requests.PeriodicTriggerRequest:
+      required:
+      - period_ms
+      type: object
+      properties:
+        period_ms:
+          type: number
+          description: |
+            The interval between firings of the trigger in milliseconds.
+        triggers:
+          uniqueItems: true
+          type: array
+          description: |
+            The names of the triggers that specify when the periodic sequence should be started.
+            If empty, the sequence is started once after periodic trigger's activation.
+          items:
+            type: string
+        count:
+          type: integer
+          description: |
+            Maximum number of times to trigger within a single periodic sequence.
+            If not set, triggers indefinitely until the periodic trigger is deactivated.
+
+    requests.ReportConfigRequest:
+      type: object
+      properties:
+        message_builder:
+          $ref: "#/components/schemas/requests.MessageBuilderRequest"
+        name:
+          type: string
+        report_incomplete:
+          type: boolean
+        report_initial:
+          type: boolean
+        trigger_names:
+          type: array
+          items:
+            type: string
+    requests.RisingEdgeRequest:
+      type: object
+      properties:
+        rising_options:
+          $ref: "#/components/schemas/requests.EdgeOptionsRequest"
+        fire_initial:
+          $ref: "#/components/schemas/requests.FireInitial"
+        initialize_expression:
+          $ref: "#/components/schemas/requests.InitializeExpression"
+    requests.DataSourceConfigurationRequest:
+      type: object
+      properties:
+        type_url:
+          type: string
+        value:
+          type: array
+          description: |-
+            Must be a valid serialized protocol buffer of the above specified type.
+            Mutually exclusive with `ValueTextproto` and `ValueJson`.
+          items:
+            type: integer
+        value_json:
+          type: object
+          description: |-
+            Must be a valid json representation of the above specified type.
+            Mutually exclusive with `Value` and `ValueTextproto`.
+        value_textproto:
+          type: string
+          description: |-
+            Must be a valid textproto instance of the above specified type.
+            Mutually exclusive with `Value` and `ValueJson`.
+
+    requests.TriggerRequest:
+      type: object
+      properties:
+        conditional:
+          $ref: "#/components/schemas/requests.ConditionalTriggerRequest"
+        data:
+          $ref: "#/components/schemas/requests.DataTriggerRequest"
+        name:
+          type: string
+        periodic:
+          $ref: "#/components/schemas/requests.PeriodicTriggerRequest"
+    requests.TriggerRequestV1:
+      type: object
+      properties:
+        conditional:
+          $ref: "#/components/schemas/requests.ConditionalTriggerRequest"
+        data:
+          $ref: "#/components/schemas/requests.DataTriggerRequestV1"
+        name:
+          type: string
+        periodic:
+          $ref: "#/components/schemas/requests.PeriodicTriggerRequest"
+    signal_versions.VSCatalogVersion:
+      required:
+      - vehicle_signals
+      - version
+      type: object
+      properties:
+        vehicle_signals:
+          type: string
+          description: A `google.protobuf.FileDescriptorSet` protobuf message (base64-encoded)
+            containing the Vehicle Signals
+          format: base64
+          example: Cq4BChxhZnRlcl9ldmVudF9jb2xsZWN0aW9uLnByb3RvEhxnb29nbGUuc2R2LnRlbGVtZXRyeV9zYW1wbGVzIkYKCEV2ZW50TXNnEhQKBWV2ZW50GAEgASgFUgVldmVudBIkCg5pc19maXJzdF9ldmVudBgCIAEoCFIMaXNGaXJzdEV2ZW50IiAKCFNwZWVkTXNnEhQKBXNwZWVkGAEgASgFUgVzcGVlZGIGcHJvdG8z
+        version:
+          minLength: 1
+          type: string
+          description: Vendor-defined identifier of the catalog
+          example: v1
+      description: Vehicle Signal Catalog
+    signal_versions.VSCatalogVersionMetadata:
+      required:
+      - version
+      type: object
+      properties:
+        version:
+          minLength: 1
+          type: string
+          description: Vendor-defined identifier of the catalog
+          example: v1
+      description: Vehicle Signal Catalog metadata
+    signal_versions.VSCatalogVersionsMetadata:
+      required:
+      - versions
+      type: object
+      properties:
+        versions:
+          type: array
+          description: List of Vehicle Signal Catalog metadata
+          items:
+            $ref: "#/components/schemas/signal_versions.VSCatalogVersionMetadata"
+      description: A list of Vehicle Signal Catalog metadata
+    errors.JsonErrorResponse_error:
+      type: object
+      properties:
+        code:
+          type: integer
+          description: HTTP status code
+          example: 403
+        details:
+          type: array
+          description: Array of objects containing further error details identified by their @type member
+          items:
+            type: object
+            properties: {}
+        message:
+          type: string
+          description: Developer-facing message in English
+        status:
+          type: string
+          description: Google RPC canonical status code
+          enum:
+          - OK
+          - CANCELLED
+          - UNKNOWN
+          - INVALID_ARGUMENT
+          - DEADLINE_EXCEEDED
+          - NOT_FOUND
+          - ALREADY_EXISTS
+          - PERMISSION_DENIED
+          - UNAUTHENTICATED
+          - RESOURCE_EXHAUSTED
+          - FAILED_PRECONDITION
+          - ABORTED
+          - OUT_OF_RANGE
+          - UNIMPLEMENTED
+          - INTERNAL
+          - UNAVAILABLE
+          - DATA_LOSS
+      example:
+        code: 400
+        status: INVALID_ARGUMENT
+        message: Request validation failed
+        details:
+          - '@type': type.googleapis.com/google.rpc.BadRequest
+            fieldViolations:
+              - field: fieldName
+                description: error description
+

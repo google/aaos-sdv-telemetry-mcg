@@ -1,0 +1,161 @@
+# Copyright 2024 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+version: 3758096386
+sources {
+  name: "simple_binary"
+  data_source {
+    source_identifier: "ServiceName"
+    connection_type: SUBSCRIPTION
+    configuration {
+      [type.googleapis.com/google.protobuf.UInt32Value] {
+        value: 123
+      }
+    }
+  }
+}
+sources {
+  name: "simple_textproto"
+  data_source {
+    source_identifier: "ServiceName"
+    connection_type: SUBSCRIPTION
+    configuration {
+      [type.googleapis.com/google.protobuf.UInt32Value] {
+        value: 7
+      }
+    }
+  }
+}
+sources {
+  name: "simple_json"
+  data_source {
+    source_identifier: "ServiceName"
+    connection_type: SUBSCRIPTION
+    configuration {
+      [type.googleapis.com/google.protobuf.UInt32Value] {
+        value: 123
+      }
+    }
+  }
+}
+sources {
+  name: "empty_value_binary"
+  data_source {
+    source_identifier: "ServiceName"
+    connection_type: SUBSCRIPTION
+    configuration {
+      [type.googleapis.com/google.protobuf.UInt32Value] {
+        value: 0
+      }
+    }
+  }
+}
+sources {
+  name: "empty_value_textproto"
+  data_source {
+    source_identifier: "ServiceName"
+    connection_type: SUBSCRIPTION
+    configuration {
+      [type.googleapis.com/google.protobuf.UInt32Value] {
+        value: 0
+      }
+    }
+  }
+}
+sources {
+  name: "empty_value_json"
+  data_source {
+    source_identifier: "ServiceName"
+    connection_type: SUBSCRIPTION
+    configuration {
+      [type.googleapis.com/google.protobuf.UInt32Value] {
+        value: 0
+      }
+    }
+  }
+}
+
+sources {
+  name: "message_vehicle_signals_binary"
+  data_source {
+    source_identifier: "ServiceName"
+    connection_type: SUBSCRIPTION
+    configuration {
+      [type.googleapis.com/android.sdv.telemetry.mcg.testdata.SomeProto2Message] {
+        lalala: 7.6
+      }
+    }
+  }
+}
+sources {
+  name: "message_vehicle_signals_textproto"
+  data_source {
+    source_identifier: "ServiceName"
+    connection_type: SUBSCRIPTION
+    configuration {
+      [type.googleapis.com/android.sdv.telemetry.mcg.testdata.SomeProto2Message] {
+        lalala: 7.6
+      }
+    }
+  }
+}
+sources {
+  name: "message_vehicle_signals_json"
+  data_source {
+    source_identifier: "ServiceName"
+    connection_type: SUBSCRIPTION
+    configuration {
+      [type.googleapis.com/android.sdv.telemetry.mcg.testdata.SomeProto2Message] {
+        lalala: 7.6
+      }
+    }
+  }
+}
+
+sources {
+  name: "message_descriptor_protos_binary"
+  data_source {
+    source_identifier: "ServiceName"
+    connection_type: SUBSCRIPTION
+    configuration {
+      [type.googleapis.com/android.sdv.telemetry.mcg.testdata.MaxAvgCur] {
+        max_meters_per_hour: 3
+      }
+    }
+  }
+}
+sources {
+  name: "message_descriptor_protos_textproto"
+  data_source {
+    source_identifier: "ServiceName"
+    connection_type: SUBSCRIPTION
+    configuration {
+      [type.googleapis.com/android.sdv.telemetry.mcg.testdata.MaxAvgCur] {
+        max_meters_per_hour: 3
+      }
+    }
+  }
+}
+sources {
+  name: "message_descriptor_protos_json"
+  data_source {
+    source_identifier: "ServiceName"
+    connection_type: SUBSCRIPTION
+    configuration {
+      [type.googleapis.com/android.sdv.telemetry.mcg.testdata.MaxAvgCur] {
+        max_meters_per_hour: 3
+      }
+    }
+  }
+}

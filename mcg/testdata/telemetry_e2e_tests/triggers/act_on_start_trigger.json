@@ -1,0 +1,109 @@
+{
+    "existing_uuid": "f630897c-44c3-48c1-be0f-2f76d12398f5",
+    "triggers": [
+        {
+            "name": "start_trigger",
+            "periodic": {
+                "period_ms": 100
+            }
+        },
+        {
+            "name": "finish_trigger",
+            "periodic": {
+                "period_ms": 150
+            }
+        },
+        {
+            "name": "conditional_trigger",
+            "conditional": {
+                "triggers": [
+                    "start_trigger"
+                ],
+                "condition_type": {
+                    "is_true": {}
+                },
+                "expression": "true"
+            }
+        },
+        {
+            "name": "data_trigger",
+            "data": {
+                "source_name": "aggregator"
+            }
+        }
+    ],
+    "start_trigger_name": "start_trigger",
+    "deactivate_trigger_name": "finish_trigger",
+    "aggregators": [
+        {
+            "name": "aggregator",
+            "trigger_names": [
+                "start_trigger"
+            ],
+            "message_builder": {
+                "field_assignments": [
+                    {
+                        "field_name": "value",
+                        "aggregation": {
+                            "@type": "none",
+                            "expression": "42"
+                        }
+                    }
+                ]
+            }
+        }
+    ],
+    "report_configs": [
+        {
+            "name": "on_start_trigger",
+            "trigger_names": [
+                "start_trigger"
+            ],
+            "message_builder": {
+                "field_assignments": [
+                    {
+                        "field_name": "value",
+                        "aggregation": {
+                            "@type": "none",
+                            "expression": "42"
+                        }
+                    }
+                ]
+            }
+        },
+        {
+            "name": "on_aggregator",
+            "trigger_names": [
+                "data_trigger"
+            ],
+            "message_builder": {
+                "field_assignments": [
+                    {
+                        "field_name": "value",
+                        "aggregation": {
+                            "@type": "none",
+                            "expression": "42"
+                        }
+                    }
+                ]
+            }
+        },
+        {
+            "name": "on_conditional_trigger",
+            "trigger_names": [
+                "conditional_trigger"
+            ],
+            "message_builder": {
+                "field_assignments": [
+                    {
+                        "field_name": "value",
+                        "aggregation": {
+                            "@type": "none",
+                            "expression": "42"
+                        }
+                    }
+                ]
+            }
+        }
+    ]
+}

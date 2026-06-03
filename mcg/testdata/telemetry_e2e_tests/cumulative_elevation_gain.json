@@ -1,0 +1,109 @@
+{
+    "existing_uuid": "1e82785c-be24-46dc-a385-687884ca722f",
+    "triggers": [
+      {
+        "name": "data_trigger",
+        "data": {
+          "source_name": "elevation_publisher"
+        }
+      },
+      {
+        "name": "delta_trigger",
+        "data": {
+          "source_name": "elevation_delta_aggregator"
+        }
+      },
+      {
+        "name": "elevation_gain_trigger",
+        "conditional": {
+          "triggers": ["delta_trigger"],
+          "condition_type": {
+            "is_true": {}
+          },
+          "expression": "elevation_delta_aggregator.delta > 0"
+        }
+      },
+      {
+        "name": "elevation_loss_trigger",
+        "conditional": {
+          "triggers": ["delta_trigger"],
+          "condition_type": {
+            "is_true": {}
+          },
+          "expression": "elevation_delta_aggregator.delta < 0"
+        }
+      }
+    ],
+    "data_sources": [
+      {
+        "name": "elevation_publisher",
+        "source_identifier": ".google.sdv.telemetry_samples.ElevationTestdata"
+      }
+    ],
+    "aggregators": [
+      {
+        "name": "elevation_delta_aggregator",
+        "trigger_names": [
+          "data_trigger"
+        ],
+        "message_builder": {
+          "field_assignments": [
+            {
+              "field_name": "delta",
+              "aggregation": {
+                "@type": "delta",
+                "expression": "elevation_publisher.elevation"
+              }
+            }
+          ]
+        }
+      }
+    ],
+    "report_configs": [
+      {
+        "name": "cumulative_elevation_gain",
+        "trigger_names": ["elevation_gain_trigger"],
+        "message_builder": {
+            "field_assignments": [
+              {
+                "field_name": "cumulative_elevation_gain",
+                "aggregation": {
+                  "@type": "sum",
+                  "expression": "elevation_delta_aggregator.delta"
+                }
+              },
+              {
+                "field_name": "deltas",
+                "aggregation": {
+                  "@type": "vector",
+                  "expression": "elevation_delta_aggregator.delta"
+                }
+              }
+            ]
+          }
+      },
+      {
+        "name": "cumulative_elevation_loss",
+        "trigger_names": ["elevation_loss_trigger"],
+        "message_builder": {
+            "field_assignments": [
+              {
+                "field_name": "cumulative_elevation_loss",
+                "aggregation": {
+                  "@type": "sum",
+                  "expression": "abs(elevation_delta_aggregator.delta)"
+                }
+              },
+              {
+                "field_name": "deltas",
+                "aggregation": {
+                  "@type": "vector",
+                  "expression": "abs(elevation_delta_aggregator.delta)"
+                }
+              }
+            ]
+          }
+      }
+    ],
+    "vehicle_signals": "CnoKH2N1bXVsYXRpdmVfZWxldmF0aW9uX2dhaW4ucHJvdG8SHGdvb2dsZS5zZHYudGVsZW1ldHJ5X3NhbXBsZXMiMQoRRWxldmF0aW9uVGVzdGRhdGESHAoJZWxldmF0aW9uGAEgASgBUgllbGV2YXRpb25iBnByb3RvMw=="
+}

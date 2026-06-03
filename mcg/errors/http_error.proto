@@ -1,0 +1,43 @@
+// Copyright 2024 Google LLC
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+syntax = "proto3";
+
+package android.sdv.telemetry.mcg;
+
+import "google/protobuf/any.proto";
+import "google/rpc/code.proto";
+
+// This message defines the error schema for Google's JSON HTTP APIs.
+message ErrorBody {
+  // This message has the same semantics as `google.rpc.Status`. It uses HTTP
+  // status code instead of gRPC status code. It has extra fields `status` and
+  // `errors` for backward compatibility with [Google API Client
+  // Libraries](https://developers.google.com/api-client-library).
+  message Status {
+    // The HTTP status code that corresponds to `google.rpc.Status.code`.
+    int32 code = 1;
+    // This corresponds to `google.rpc.Status.message`.
+    string message = 2;
+    // This is the enum version for `google.rpc.Status.code`.
+    google.rpc.Code status = 4;
+    // This corresponds to `google.rpc.Status.details`.
+    repeated google.protobuf.Any details = 5;
+  }
+  // The actual error payload. The nested message structure is for backward
+  // compatibility with [Google API Client
+  // Libraries](https://developers.google.com/api-client-library). It also
+  // makes the error more readable to developers.
+  Status error = 1;
+}

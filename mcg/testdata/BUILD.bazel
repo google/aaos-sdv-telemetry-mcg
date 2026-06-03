@@ -1,0 +1,127 @@
+# Copyright 2024 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+load("@aspect_bazel_lib//lib:copy_file.bzl", "copy_file")
+load("@rules_go//go:def.bzl", "go_library")
+
+# Do not generate `go_proto_library` rules for testdata protos:
+#
+# gazelle:go_generate_proto false
+
+# Export files that are used directly by other packages (e.g., in tests).
+# This makes them visible outside of the //mcg/testdata package.
+exports_files([
+    "vsignal_api/sample_ssot_ver1.json",
+])
+
+filegroup(
+    name = "exported_testdata",
+    srcs = [
+        "378900418.json",
+        "378900418.textproto",
+        "380905512.json",
+        "380905512.textproto",
+        "api_version_compatibility/canonical_version.json",
+        "api_version_compatibility/deprecated_version.json",
+        "api_version_compatibility/output.textproto",
+        "comprehensive_descriptor_optimization.json",
+        "comprehensive_descriptor_optimization.textproto",
+        "conditional_trigger.json",
+        "conditional_trigger.textproto",
+        "custom_aggregation_message_type.json",
+        "custom_aggregation_message_type.textproto",
+        "data_source_message_types.json",
+        "data_source_message_types.textproto",
+        "eipf_b.json",
+        "eipf_b.textproto",
+        "eipf_b_fds.textproto",
+        "infer.json",
+        "infer.textproto",
+        "infer_vs.json",
+        "init_node_index.json",
+        "init_node_index.textproto",
+        "mixed_v1_v2_fixture.textproto",
+        "redis-standalone/Dockerfile",
+        "redis/Dockerfile",
+        "redis/run_cluster.sh",
+        "source_configuration.json",
+        "source_configuration.textproto",
+        "v1_legacy_fixture.textproto",
+        "v2_canonical_fixture.textproto",
+        "vsignal_api/sample_ssot_ver1.json",
+    ],
+    visibility = ["//visibility:public"],
+)
+
+copy_file(
+    name = "speed_file_descriptor_set",
+    testonly = True,
+    src = "//mcg/testdata/speed:vehicle_speed_proto",
+    out = "speed_file_descriptor_set.bin",
+)
+
+copy_file(
+    name = "maxavgcur_file_descriptor_set",
+    testonly = True,
+    src = "//mcg/testdata/maxavgcur:maxavgcur_proto",
+    out = "maxavgcur_file_descriptor_set.bin",
+)
+
+copy_file(
+    name = "proto2_example_file_descriptor_set",
+    testonly = True,
+    src = "//mcg/testdata/proto2_example:proto2_example_proto",
+    out = "proto2_example_file_descriptor_set.bin",
+)
+
+copy_file(
+    name = "vehicle_signals_sample_file_descriptor_set",
+    testonly = True,
+    src = "//mcg/testdata/vehicle_signals_sample:vehicle_signal_proto",
+    out = "vehicle_signals_sample_file_descriptor_set.bin",
+)
+
+copy_file(
+    name = "input_descriptors_sample_file_descriptor_set",
+    testonly = True,
+    src = "//mcg/testdata/input_descriptors_sample:input_descriptors_sample_proto",
+    out = "input_descriptors_sample_file_descriptor_set.bin",
+)
+
+copy_file(
+    name = "timestamp_file_descriptor_set",
+    testonly = True,
+    src = "@protobuf_src//:timestamp_proto",
+    out = "timestamp_file_descriptor_set.bin",
+)
+
+go_library(
+    name = "testdata",
+    testonly = True,
+    srcs = ["protos.go"],
+    embedsrcs = [
+        "input_descriptors_sample_file_descriptor_set.bin",
+        "maxavgcur_file_descriptor_set.bin",
+        "proto2_example_file_descriptor_set.bin",
+        "speed_file_descriptor_set.bin",
+        "timestamp_file_descriptor_set.bin",
+        "vehicle_signals_sample_file_descriptor_set.bin",
+    ],
+    importpath = "sdv.googlesource.com/mcg/mcg/testdata",
+    visibility = ["//visibility:public"],
+    deps = [
+        "@org_golang_google_protobuf//proto",
+        "@org_golang_google_protobuf//types/descriptorpb",
+    ],
+)

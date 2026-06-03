@@ -1,0 +1,87 @@
+{
+  "existing_uuid": "369aae14-ab05-4b7e-89e9-fb11aac43917",
+  "triggers": [
+    {
+      "name": "journey",
+      "data": {
+        "source_name": "journey_publisher"
+      }
+    },
+    {
+      "name": "journey_start",
+      "conditional": {
+        "triggers": [
+          "journey"
+        ],
+        "expression": "journey_publisher.event == 0",
+        "condition_type": {
+          "is_true": {}
+        }
+      }
+    },
+    {
+      "name": "journey_end",
+      "conditional": {
+        "triggers": [
+          "journey"
+        ],
+        "expression": "journey_publisher.event == 1",
+        "condition_type": {
+          "is_true": {}
+        }
+      }
+    }
+  ],
+  "start_trigger_name": "journey_start",
+  "deactivate_trigger_name": "journey_end",
+  "data_sources": [
+    {
+      "name": "distance_publisher",
+      "source_identifier": ".google.sdv.telemetry_samples.Distance",
+      "connection_type": "SUBSCRIPTION"
+    },
+    {
+      "name": "journey_publisher",
+      "source_identifier": ".google.sdv.telemetry_samples.Journey"
+    }
+  ],
+  "aggregators": [
+    {
+      "name": "distance_storage",
+      "trigger_names": [
+        "journey_start"
+      ],
+      "message_builder": {
+        "field_assignments": [
+          {
+            "field_name": "distance",
+            "aggregation": {
+              "@type": "none",
+              "expression": "distance_publisher.distance"
+            }
+          }
+        ]
+      }
+    }
+  ],
+  "report_configs": [
+    {
+      "name": "report",
+      "trigger_names": [
+        "journey_end"
+      ],
+      "message_builder": {
+        "field_assignments": [
+          {
+            "field_name": "value",
+            "aggregation": {
+              "@type": "none",
+              "expression": "distance_publisher.distance - distance_storage.distance"
+            }
+          }
+        ]
+      }
+    }
+  ],
+  "vehicle_signals": "CoABCg9vcGVyYXRvcnMucHJvdG8SHGdvb2dsZS5zZHYudGVsZW1ldHJ5X3NhbXBsZXMiHwoHSm91cm5leRIUCgVldmVudBgBIAEoBVIFZXZlbnQiJgoIRGlzdGFuY2USGgoIZGlzdGFuY2UYASABKAFSCGRpc3RhbmNlYgZwcm90bzM="
+}

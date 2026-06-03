@@ -1,0 +1,119 @@
+// Copyright 2023 Google LLC
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+// Defines a schema for SOMEIP mapping in VSIDL.
+
+// WARNING: This is an experimental API and not expected to be stable or final.
+//          Content of the file might drastically change with further
+//          development iterations.
+
+syntax = "proto3";
+
+import "mcg/testdata/vehicle_signals_sample/sdv_protos/syntax/someip_type.proto";
+
+package sdv.vsidl;
+
+// Type of the service the SDV mapping is built for
+enum ServiceType {
+  UNSPECIFIED = 0;
+  SDV = 1;
+  SOMEIP = 2;
+}
+
+message SomeIpMapping {
+  // Service instance mapping to topics
+  message Instance {
+    // SOME/IP Instance ID
+    uint32 instance_id = 1;
+    // Map of ids and related topic names. Those topics are referenced by id
+    // inside interface definition.
+    map<uint32, string> topic_parameterization = 2;
+  }
+
+  // Service interface definition - used to describe different versions of the
+  // same service.
+  message Interface {
+    // Mapping for RPCs
+    message RPC {
+      // Full name of related procedure on SDV side:
+      // [<package>.]<RPC interface>.<procedure>
+      string procedure = 1;
+      // Method ID on SOME/IP side.
+      uint32 method_id = 2;
+      // Mapping rule for a RPC request. May be omitted to represent methods
+      // that take no arguments.
+      optional SomeIpType request_payload_mapping = 3;
+      // Mapping rule for a RPC response. May be omitted to represent void
+      // methods.
+      optional SomeIpType response_payload_mapping = 4;
+    }
+
+    // Mapping for topics which should be communicated via `fire & forget` call
+    // on SOME/IP side.
+    message TopicToFireAndForget {
+      // Topic IDs on SDV side (IDs assigned as a part of instance definition).
+      repeated uint32 topic_id = 1;
+      // Method ID on SOME/IP side.
+      uint32 method_id = 2;
+      // Mapping rule for argument payload data
+      SomeIpType payload_type = 3;
+    }
+
+    // SOME/IP event mapping to SDV topics.
+    message Event {
+      message SimpleEvent {
+        // Topic ID on SDV side (IDs assigned as a part of instance definition).
+        uint32 topic_id = 1;
+        // SOME/IP data format of the event
+        SomeIpType type = 2;
+      }
+      message GroupEvent {
+        repeated SimpleEvent event_part = 1;
+      }
+      // SOME/IP group ID of the event (several events may share same group ID)
+      uint32 group_id = 1;
+      // SOME/IP event ID. Actual size is 16 bits
+      uint32 event_id = 2;
+
+      oneof ev {
+        SimpleEvent event = 3;
+        GroupEvent group_event = 4;
+      }
+    }
+
+    // Major version of the interface. Actual size is 8 bits
+    uint32 version_major = 1;
+    // Minor version of the interface
+    uint32 version_minor = 2;
+    // List of events offered by the interface
+    repeated Event offered_event = 3;
+    // RPCs that are exposed by the service
+    repeated RPC offered_rpc = 4;
+    // List of `fire & forget` methods for multi-pub. This field will only be
+    // used when service type is set to SOMEIP
+    repeated TopicToFireAndForget topic_to_fire_and_forget = 5;
+  }
+
+  // 'SDV` if mapping defines SOME/IP API surface for existing SDV service,
+  // `SOMEIP` if it defines API of an external service.
+  ServiceType service_type = 1;
+  // SDV service bundle name
+  string sdv_service_name = 2;
+  // SOME/IP service ID. Actual size is 16 bits.
+  uint32 someip_service_id = 3;
+  // SOME/IP instances definition with corresponding topics assigned to them
+  repeated Instance instance = 4;
+  // SOME/IP interfaces offered by a service
+  repeated Interface interface = 5;
+}

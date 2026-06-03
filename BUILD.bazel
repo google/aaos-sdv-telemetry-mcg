@@ -1,0 +1,93 @@
+# Copyright 2024 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+load("@bazel_skylib//rules:diff_test.bzl", "diff_test")
+load("@rules_go//go:def.bzl", "TOOLS_NOGO", "go_binary", "go_library", "nogo")
+load("@rules_go//proto:compiler.bzl", "go_proto_compiler")
+load(
+    "@rules_go//proto/wkt:well_known_types.bzl",
+    "WELL_KNOWN_TYPES_APIV2",
+)
+
+exports_files(["LICENSE"])
+
+# gazelle:prefix sdv.googlesource.com/mcg
+# gazelle:exclude docs/
+# gazelle:exclude **/empty.go
+# gazelle:go_generate_proto true
+# gazelle:go_proto_compilers //:go_proto_compiler
+
+nogo(
+    name = "my_nogo",
+    visibility = ["//visibility:public"],
+    deps = TOOLS_NOGO,
+)
+
+go_library(
+    name = "mcg_lib",
+    srcs = [
+        "docs.go",
+        "main.go",
+    ],
+    importpath = "sdv.googlesource.com/mcg",
+    visibility = ["//visibility:private"],
+    deps = [
+        "//mcg",
+        "//mcg/docs",
+        "//mcg/errors",
+        "//mcg/vs_cache",
+        "@com_github_gin_gonic_gin//:gin",
+    ],
+)
+
+go_binary(
+    name = "mcg",
+    embed = [":mcg_lib"],
+    importpath = "sdv.googlesource.com/mcg",
+    visibility = ["//visibility:public"],
+)
+
+go_proto_compiler(
+    name = "go_proto_compiler",
+    options = [
+        "default_api_level=API_OPAQUE",
+    ],
+    plugin = "@org_golang_google_protobuf//cmd/protoc-gen-go",
+    visibility = ["//visibility:public"],
+    deps = WELL_KNOWN_TYPES_APIV2 + [
+        "@org_golang_google_protobuf//reflect/protoreflect:go_default_library",
+        "@org_golang_google_protobuf//reflect/protoregistry:go_default_library",
+        "@org_golang_google_protobuf//runtime/protoimpl:go_default_library",
+    ],
+)
+
+# Extract the Bazel version used in cloudbuild.yaml
+genrule(
+    name = "cloudbuild_bazelversion",
+    srcs = [
+        "cloudbuild.yaml",
+    ],
+    outs = ["cloudbuild_bazelversion.txt"],
+    cmd = "grep -oE 'eu[.]gcr[.]io/cloud-telemetry-simulation/bazel:.+' \"$<\" | grep -oE '[0-9][0-9.]+' | sort -u > $@",
+    toolchains = ["@jq_toolchains//:resolved_toolchain"],
+)
+
+# This checks that the Bazel version used in cloudbuild.yaml matches the Bazel
+# version in `.bazelversion`
+diff_test(
+    name = "cloudrun_bazel_version_test",
+    size = "small",
+    file1 = ".bazelversion",
+    file2 = ":cloudbuild_bazelversion",
+)

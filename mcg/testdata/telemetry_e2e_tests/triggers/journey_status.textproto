@@ -1,0 +1,95 @@
+# Copyright 2026 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+version: 3758096386
+descriptor_protos {
+  name: "adhoc.proto"
+  package: "aaos.sdv.telemetry.adhoc"
+  message_type {
+    name: "report"
+    field {
+      name: "value"
+      number: 1
+      type: TYPE_INT32
+    }
+  }
+  syntax: "proto2"
+}
+triggers {
+  name: "journey_end"
+  conditional_trigger {
+    trigger_names: "journey_event"
+    selector_node_index: 1
+    falling_edge {
+      initialize_node_index: 2
+    }
+  }
+}
+triggers {
+  name: "journey_event"
+  data_trigger {
+    source_name: "journey_source"
+  }
+}
+triggers {
+  name: "journey_start"
+  conditional_trigger {
+    trigger_names: "journey_event"
+    selector_node_index: 1
+    rising_edge {
+      initialize_node_index: 0
+    }
+  }
+}
+sources {
+  name: "journey_source"
+  data_source {
+    source_identifier: "com.google.sdv.telemetry.JourneySource"
+    connection_type: SUBSCRIPTION
+    fetch_last_message: true
+  }
+}
+# Expression Node 0
+expression_nodes {
+  constant_leaf_node {
+    bool_value: false
+  }
+}
+# Expression Node 1
+expression_nodes {
+  field_leaf_node {
+    source_name: "journey_source"
+    field_names: "status"
+  }
+}
+# Expression Node 2
+expression_nodes {
+  constant_leaf_node {
+    bool_value: true
+  }
+}
+metrics_report_configs {
+  name: "report"
+  trigger_names: "journey_start"
+  trigger_names: "journey_end"
+  message_builder {
+    message_type: ".aaos.sdv.telemetry.adhoc.report"
+    field_assignments {
+      field_name: "value"
+      count_aggregation {}
+    }
+  }
+}
+start_trigger_name: "journey_start"
+stop_trigger_name: "journey_end"

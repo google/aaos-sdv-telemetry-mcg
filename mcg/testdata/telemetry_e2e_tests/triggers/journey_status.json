@@ -1,0 +1,68 @@
+{
+  "existing_uuid": "bcbffd01-42ba-4444-ae35-908b907c48b8",
+  "triggers": [
+    {
+      "name": "journey_event",
+      "data": {
+        "source_name": "journey_source"
+      }
+    },
+    {
+      "name": "journey_start",
+      "conditional": {
+        "triggers": [
+          "journey_event"
+        ],
+        "expression": "journey_source.status",
+        "condition_type": {
+          "rising_edge": {
+            "initialize_expression": "false"
+          }
+        }
+      }
+    },
+    {
+      "name": "journey_end",
+      "conditional": {
+        "triggers": [
+          "journey_event"
+        ],
+        "expression": "journey_source.status",
+        "condition_type": {
+          "falling_edge": {
+            "initialize_expression": "true"
+          }
+        }
+      }
+    }
+  ],
+  "start_trigger_name": "journey_start",
+  "stop_trigger_name": "journey_end",
+  "data_sources": [
+    {
+      "name": "journey_source",
+      "source_identifier": "com.google.sdv.telemetry.JourneySource",
+      "fetch_last_message": true
+    }
+  ],
+  "report_configs": [
+    {
+      "name": "report",
+      "trigger_names": [
+        "journey_start",
+        "journey_end"
+      ],
+      "message_builder": {
+        "field_assignments": [
+          {
+            "field_name": "value",
+            "aggregation": {
+              "@type": "count"
+            }
+          }
+        ]
+      }
+    }
+  ],
+  "vehicle_signals": "CmEKFGpvdXJuZXlfc3RhdHVzLnByb3RvEhhjb20uZ29vZ2xlLnNkdi50ZWxlbWV0cnkiJwoNSm91cm5leVNvdXJjZRIWCgZzdGF0dXMYASABKAhSBnN0YXR1c2IGcHJvdG8z"
+}

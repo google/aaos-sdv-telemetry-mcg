@@ -1,0 +1,63 @@
+// Copyright 2023 Google LLC
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+// Defines messages derived from with VSIDL Catalog information that are needed
+// in runtime of SDV VMs.
+
+// WARNING: This is an experimental API and not expected to be stable or final.
+//          Content of the file might drastically change with further
+//          development iterations.
+
+syntax = "proto3";
+package sdv.vsidl;
+
+import "google/protobuf/descriptor.proto";
+import "mcg/testdata/vehicle_signals_sample/sdv_protos/syntax/someip.proto";
+import "mcg/testdata/vehicle_signals_sample/sdv_protos/syntax/diagnostics.proto";
+
+// SDV topic mapping that includes the topic name, the message name and the file
+// descriptor.
+message VsidlRuntimeConfig {
+  message MessageDescriptorMapping {
+    string message_name = 1;
+    string file_name = 3;
+  }
+  message TopicMessageMapping {
+    string topic_name = 1;
+    string message_name = 2;
+    // Precalculated size of the proto message given SDV size annotations.
+    uint32 message_size = 3;
+  }
+  message RpcMessageMapping {
+    string procedure_name = 1;
+    string input_message_name = 2;
+    string output_message_name = 3;
+  }
+  repeated TopicMessageMapping topic_mapping = 1;
+  repeated MessageDescriptorMapping descriptor_mapping = 2;
+  repeated RpcMessageMapping rpc_mapping = 3;
+  repeated google.protobuf.FileDescriptorProto file_descriptor_proto = 4;
+}
+
+// SOME/IP topics in the VSDIL files that should be used by the broker to
+// subscribe and publish to DT topics.
+message SomeipRuntimeConfig {
+  repeated SomeIpMapping some_ip_mapping = 2;
+}
+
+// Declarations of diagnostics capabilities of SDV services.
+// E.g. provided data items, routines, etc.
+message DiagnosticsRuntimeConfig {
+  map<string, DiagnosticsDeclaration> diagnostics_declaration = 1;
+}

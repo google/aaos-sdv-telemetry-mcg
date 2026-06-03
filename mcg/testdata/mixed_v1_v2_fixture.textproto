@@ -1,0 +1,15 @@
+# Mixed format: has 'publishers' (legacy) and 'stop_trigger_name' (canonical)
+publishers {
+  name: "source1"
+  service_publisher {
+    service_name: "service1"
+    connection_type: GETTER
+  }
+}
+stop_trigger_name: "stop"
+triggers {
+  name: "stop"
+  periodic {
+    period_ms: 1000
+  }
+}

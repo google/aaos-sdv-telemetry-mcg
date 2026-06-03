@@ -1,0 +1,377 @@
+# Copyright 2024 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+version: 3758096386
+descriptor_protos {
+  name: "adhoc.proto"
+  package: "aaos.sdv.telemetry.adhoc"
+  dependency: "google/protobuf/any.proto"
+  dependency: "mcg/testdata/vehicle_signals_sample/subpkg/sample_speed.proto"
+  message_type {
+    name: "aggregations"
+    field {
+      name: "none_meters_per_hour"
+      number: 1
+      type: TYPE_DOUBLE
+    }
+    field {
+      name: "vector_meters_per_hour"
+      number: 2
+      type: TYPE_DOUBLE
+      label: LABEL_REPEATED
+    }
+    field {
+      name: "max_meters_per_hour"
+      number: 3
+      type: TYPE_DOUBLE
+    }
+    field {
+      name: "min_meters_per_hour"
+      number: 4
+      type: TYPE_INT32
+    }
+    field {
+      name: "avg_meters_per_hour"
+      number: 5
+      type: TYPE_DOUBLE
+    }
+    field {
+      name: "count_meters_per_hour"
+      number: 6
+      type: TYPE_INT32
+    }
+    field {
+      name: "sum_meters_per_hour"
+      number: 7
+      type: TYPE_INT32
+    }
+    field {
+      name: "stddev_meters_per_hour"
+      number: 8
+      type: TYPE_DOUBLE
+    }
+    field {
+      name: "delta_meters_per_hour"
+      number: 9
+      type: TYPE_INT32
+    }
+  }
+  message_type {
+    name: "max_avg_cur"
+    field {
+      name: "avg_meters_per_hour_rep"
+      number: 1
+      type: TYPE_DOUBLE
+    }
+    field {
+      name: "max_meters_per_hour_rep"
+      number: 2
+      type: TYPE_DOUBLE
+    }
+    field {
+      name: "cur_meters_per_hour_rep"
+      number: 3
+      type: TYPE_FLOAT
+    }
+    field {
+      name: "min_meters_per_hour_rep"
+      number: 4
+      type: TYPE_INT32
+    }
+    field {
+      name: "speed_msg_list"
+      number: 5
+      label: LABEL_REPEATED
+      type: TYPE_MESSAGE
+      type_name: ".google.protobuf.Any"
+    }
+    field {
+      name: "speed_enum_field"
+      number: 6
+      type: TYPE_ENUM
+      type_name: ".mcg.test.subpkg.speed_unit"
+    }
+    field {
+      name: "source_without_field_specified"
+      number: 7
+      type: TYPE_MESSAGE
+      type_name: ".google.protobuf.Any"
+    }
+  }
+  syntax: "proto2"
+}
+
+descriptor_protos {
+  name: "mcg/testdata/vehicle_signals_sample/subpkg/sample_speed.proto"
+  package: "mcg.test.subpkg"
+  enum_type {
+    name: "speed_unit"
+    value {
+      name: "METRIC"
+      number: 0
+    }
+    value {
+      name: "IMPERIAL"
+      number: 1
+    }
+    value {
+      name: "RPM"
+      number: 2
+    }
+  }
+  syntax: "proto3"
+}
+
+triggers {
+  name: "periodic_5s"
+  periodic_trigger {
+    interval {
+      seconds: 5
+    }
+  }
+}
+triggers {
+  name: "trip_end"
+  conditional_trigger {
+    trigger_names: "trip_state_trigger"
+    selector_node_index: 0
+    is_true {}
+  }
+}
+triggers {
+  name: "trip_state_trigger"
+  data_trigger {
+    source_name: "trip_state_publisher"
+  }
+}
+sources {
+  name: "aggregations"
+  aggregator {
+    trigger_names: "periodic_5s"
+    reset_on_get: true
+    message_builder {
+      message_type: ".aaos.sdv.telemetry.adhoc.aggregations"
+      field_assignments {
+        field_name: "none_meters_per_hour"
+        no_aggregation {
+          expression_node_index: 1
+        }
+      }
+      field_assignments {
+        field_name: "vector_meters_per_hour"
+        vector_aggregation {
+          expression_node_index: 1
+        }
+      }
+      field_assignments {
+        field_name: "max_meters_per_hour"
+        max_aggregation {
+          expression_node_index: 1
+        }
+      }
+      field_assignments {
+        field_name: "min_meters_per_hour"
+        min_aggregation {
+          expression_node_index: 2
+        }
+      }
+      field_assignments {
+        field_name: "avg_meters_per_hour"
+        avg_aggregation {
+          expression_node_index: 2
+        }
+      }
+      field_assignments {
+        field_name: "count_meters_per_hour"
+        count_aggregation {}
+      }
+      field_assignments {
+        field_name: "sum_meters_per_hour"
+        sum_aggregation {
+          expression_node_index: 2
+        }
+      }
+      field_assignments {
+        field_name: "stddev_meters_per_hour"
+        std_dev_aggregation {
+          expression_node_index: 2
+        }
+      }
+      field_assignments {
+        field_name: "delta_meters_per_hour"
+        delta_aggregation {
+          expression_node_index: 2
+        }
+      }
+    }
+  }
+}
+sources {
+  name: "speed"
+  data_source {
+    source_identifier: ".mcg.test.car_speed_msg"
+    connection_type: SUBSCRIPTION
+  }
+}
+sources {
+  name: "speed_report"
+  data_source {
+    source_identifier: ".mcg.test.report.speed_report"
+    connection_type: SUBSCRIPTION
+  }
+}
+sources {
+  name: "trip_state_publisher"
+  data_source {
+    source_identifier: ".mcg.test.subpkg.trigger_msg"
+    connection_type: SUBSCRIPTION
+  }
+}
+# Expression Node 0
+expression_nodes {
+  field_leaf_node {
+    source_name: "trip_state_publisher"
+    field_names: "trigger_value"
+  }
+}
+# Expression Node 1
+expression_nodes {
+  field_leaf_node {
+    source_name: "speed"
+    field_names: "speed"
+  }
+}
+# Expression Node 2
+expression_nodes {
+  field_leaf_node {
+    source_name: "speed"
+    field_names: "sample_int"
+  }
+}
+# Expression Node 3
+expression_nodes {
+  field_leaf_node {
+    source_name: "aggregations"
+    field_names: "avg_meters_per_hour"
+  }
+}
+# Expression Node 4
+expression_nodes {
+  constant_leaf_node {
+    int32_value: 1
+  }
+}
+# Expression Node 5
+expression_nodes {
+  combination_node {
+    left_index: 3
+    right_index: 4
+    arithmetic_operator: ADD
+  }
+}
+# Expression Node 6
+expression_nodes {
+  field_leaf_node {
+    source_name: "aggregations"
+    field_names: "max_meters_per_hour"
+  }
+}
+# Expression Node 7
+expression_nodes {
+  field_leaf_node {
+    source_name: "speed"
+    field_names: "sample_float"
+  }
+}
+# Expression Node 8
+expression_nodes {
+  field_leaf_node {
+    source_name: "aggregations"
+    field_names: "min_meters_per_hour"
+  }
+}
+# Expression Node 9
+expression_nodes {
+  field_leaf_node {
+    source_name: "speed_report"
+    field_names: "car_speed_list"
+    field_names: "speed_msg"
+  }
+}
+# Expression Node 10
+expression_nodes {
+  field_leaf_node {
+    source_name: "speed"
+    field_names: "unit"
+  }
+}
+# Expression Node 11
+expression_nodes {
+  field_leaf_node {
+    source_name: "speed"
+  }
+}
+
+metrics_report_configs {
+  name: "max_avg_cur"
+  trigger_names: "trip_end"
+  report_incomplete: true
+  message_builder {
+    message_type: ".aaos.sdv.telemetry.adhoc.max_avg_cur"
+    field_assignments {
+      field_name: "avg_meters_per_hour_rep"
+      no_aggregation {
+        expression_node_index: 5
+      }
+    }
+    field_assignments {
+      field_name: "max_meters_per_hour_rep"
+      no_aggregation {
+        expression_node_index: 6
+      }
+    }
+    field_assignments {
+      field_name: "cur_meters_per_hour_rep"
+      no_aggregation {
+        expression_node_index: 7
+      }
+    }
+    field_assignments {
+      field_name: "min_meters_per_hour_rep"
+      no_aggregation {
+        expression_node_index: 8
+      }
+    }
+    field_assignments {
+      field_name: "speed_msg_list"
+      no_aggregation {
+        expression_node_index: 9
+      }
+    }
+    field_assignments {
+      field_name: "speed_enum_field"
+      no_aggregation {
+        expression_node_index: 10
+      }
+    }
+    field_assignments {
+      field_name: "source_without_field_specified"
+      no_aggregation {
+        expression_node_index: 11
+      }
+    }
+  }
+}
+start_trigger_name: "periodic_5s"
+stop_trigger_name: "trip_end"

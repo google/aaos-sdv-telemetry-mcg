@@ -1,0 +1,228 @@
+{
+  "_description": [
+    "Generates metrics reports containing 5-seconds sampled speed when an `event`",
+    "is published. If adjacent events take place within a 5 seconds range, they",
+    "are considered to be a 'series of events`.",
+    "This configuration allows reporting speed aggregated over a period of",
+    "5 seconds after the series' first and last event occur, as well as speed",
+    "aggregated over a period of 5 seconds before **any** event occurs.",
+    "",
+    "This configuration uses two aggregators for storing event timestamps. When a new",
+    "event is published, it stores its timestamp along with previous event timestamp",
+    "to be able to deterministally find which event is the first one for a series"
+  ],
+  "existing_uuid": "1c1a37e5-f03b-4e6d-bef0-3b91db4d46f8",
+  "triggers": [
+    {
+      "name": "periodic_400ms",
+      "periodic": {
+        "period_ms": 400
+      }
+    },
+    {
+      "name": "periodic_1s",
+      "periodic": {
+        "period_ms": 1000
+      }
+    },
+    {
+      "name": "event_trigger",
+      "data": {
+        "source_name": "event_publisher"
+      }
+    },
+    {
+      "name": "on_event_processed_trigger",
+      "data": {
+        "source_name": "on_new_event_aggregator"
+      }
+    },
+    {
+      "name": "new_event_timestamp_updated_trigger",
+      "data": {
+        "source_name": "new_event_timestamp_publisher"
+      }
+    },
+    {
+      "name": "event_series_start_trigger",
+      "conditional": {
+        "triggers": [
+          "new_event_timestamp_updated_trigger"
+        ],
+        "expression": "on_new_event_aggregator.events_count == 1 || (new_event_timestamp_publisher.timestamp - on_new_event_aggregator.previous_event_timestamp) >= 5000000",
+        "condition_type": {
+          "is_true": {}
+        }
+      }
+    },
+    {
+      "_comments": "Triggers 5 seconds after the latest event takes place",
+      "name": "on_series_last_event_timer_trigger",
+      "conditional": {
+        "triggers": [
+          "periodic_400ms"
+        ],
+        "expression": "(timestamp(MONOTONIC_TIME_SINCE_BOOT) - new_event_timestamp_publisher.timestamp) >= 5000000",
+        "condition_type": {
+          "rising_edge": {}
+        }
+      }
+    },
+    {
+      "_comments": "Triggers 5 seconds after the first event of the series takes place",
+      "name": "on_series_first_event_timer_trigger",
+      "conditional": {
+        "triggers": [
+          "periodic_400ms"
+        ],
+        "expression": "(timestamp(MONOTONIC_TIME_SINCE_BOOT) - series_first_event_timestamp_publisher.timestamp) >= 5000000",
+        "condition_type": {
+          "rising_edge": {}
+        }
+      }
+    }
+  ],
+  "data_sources": [
+    {
+      "name": "event_publisher",
+      "source_identifier": ".google.sdv.telemetry_samples.EventMsg"
+    },
+    {
+      "name": "speed_publisher",
+      "source_identifier": ".google.sdv.telemetry_samples.SpeedMsg"
+    }
+  ],
+  "aggregators": [
+    {
+      "_comment": "Updates new event timestamp - only after updating previous event timestamp",
+      "name": "new_event_timestamp_publisher",
+      "trigger_names": [
+        "on_event_processed_trigger"
+      ],
+      "message_builder": {
+        "field_assignments": [
+          {
+            "field_name": "timestamp",
+            "aggregation": {
+              "@type": "none",
+              "expression": "timestamp(MONOTONIC_TIME_SINCE_BOOT)"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "_comment": "Updates latest event timestamp when a new event comes",
+      "name": "on_new_event_aggregator",
+      "trigger_names": [
+        "event_trigger"
+      ],
+      "message_builder": {
+        "field_assignments": [
+          {
+            "field_name": "previous_event_timestamp",
+            "aggregation": {
+              "@type": "none",
+              "expression": "new_event_timestamp_publisher.timestamp"
+            }
+          },
+          {
+            "field_name": "events_count",
+            "aggregation": {
+              "@type": "count"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "series_first_event_timestamp_publisher",
+      "trigger_names": [
+        "event_series_start_trigger"
+      ],
+      "message_builder": {
+        "field_assignments": [
+          {
+            "field_name": "timestamp",
+            "aggregation": {
+              "@type": "none",
+              "expression": "timestamp(MONOTONIC_TIME_SINCE_BOOT)"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "speed_vector_aggregator",
+      "trigger_names": [
+        "periodic_1s"
+      ],
+      "message_builder": {
+        "field_assignments": [
+          {
+            "field_name": "vector",
+            "aggregation": {
+              "@type": "vector",
+              "expression": "speed_publisher.speed",
+              "max_length": 5
+            }
+          }
+        ]
+      }
+    }
+  ],
+  "report_configs": [
+    {
+      "name": "before_event_collected_data",
+      "trigger_names": [
+        "event_trigger"
+      ],
+      "message_builder": {
+        "field_assignments": [
+          {
+            "field_name": "speed_vector",
+            "aggregation": {
+              "@type": "none",
+              "expression": "speed_vector_aggregator.vector"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "after_series_first_event_collected_data",
+      "trigger_names": [
+        "on_series_first_event_timer_trigger"
+      ],
+      "message_builder": {
+        "field_assignments": [
+          {
+            "field_name": "speed_vector",
+            "aggregation": {
+              "@type": "none",
+              "expression": "speed_vector_aggregator.vector"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "after_series_last_event_collected_data",
+      "trigger_names": [
+        "on_series_last_event_timer_trigger"
+      ],
+      "message_builder": {
+        "field_assignments": [
+          {
+            "field_name": "speed_vector",
+            "aggregation": {
+              "@type": "none",
+              "expression": "speed_vector_aggregator.vector"
+            }
+          }
+        ]
+      }
+    }
+  ],
+  "vehicle_signals": "CogBChxhZnRlcl9ldmVudF9jb2xsZWN0aW9uLnByb3RvEhxnb29nbGUuc2R2LnRlbGVtZXRyeV9zYW1wbGVzIiAKCEV2ZW50TXNnEhQKBWV2ZW50GAEgASgFUgVldmVudCIgCghTcGVlZE1zZxIUCgVzcGVlZBgBIAEoBVIFc3BlZWRiBnByb3RvMw=="
+}

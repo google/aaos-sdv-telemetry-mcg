@@ -1,0 +1,37 @@
+{
+    "existing_uuid": "91a83072-fb29-4c85-822e-06b8290f9e50",
+    "triggers": [
+        {
+            "name": "periodic_400ms",
+            "periodic": {
+                "period_ms": 400
+            }
+        },
+        {
+            "name": "periodic_600ms",
+            "periodic": {
+                "period_ms": 600
+            }
+        }
+    ],
+    "start_trigger_name": "periodic_400ms",
+    "report_configs": [
+        {
+            "name": "report",
+            "trigger_names": [
+                "periodic_600ms"
+            ],
+            "message_builder": {
+                "field_assignments": [
+                    {
+                        "field_name": "value",
+                        "aggregation": {
+                            "@type": "none",
+                            "expression": "42"
+                        }
+                    }
+                ]
+            }
+        }
+    ]
+}

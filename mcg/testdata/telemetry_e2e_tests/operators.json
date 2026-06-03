@@ -1,0 +1,397 @@
+{
+    "existing_uuid": "f910f4ef-573f-40c6-b75e-289ce8f67b1d",
+
+    "triggers": [
+      {
+        "name": "data_trigger",
+        "data": {
+          "source_name": "data_publisher"
+        }
+      },
+      {
+        "name": "periodic_1s",
+        "periodic": {
+          "period_ms": 1000
+        }
+      }
+    ],
+    "data_sources": [
+      {
+        "name": "data_publisher",
+        "source_identifier": ".google.sdv.telemetry_samples.OperatorsTestdata"
+      }
+    ],
+    "aggregators": [
+      {
+        "name": "aggregations",
+        "trigger_names": [
+          "data_trigger"
+        ],
+        "message_builder": {
+          "field_assignments": [
+            {
+              "field_name": "integer_list",
+              "aggregation": {
+                "@type": "vector",
+                "expression": "data_publisher.integer"
+              }
+            }
+          ]
+        }
+      }
+    ],
+    "report_configs": [
+      {
+        "name": "integer_report",
+        "trigger_names": [
+          "periodic_1s"
+        ],
+        "message_builder": {
+          "field_assignments": [
+            {
+                "field_name": "integer",
+                "aggregation": {
+                  "@type": "none",
+                  "expression": "data_publisher.integer"
+                }
+            },
+            {
+                "field_name": "relational_equal",
+                "aggregation": {
+                  "@type": "none",
+                  "expression": "data_publisher.integer == 30.0"
+                }
+            },
+            {
+                "field_name": "relational_not_equal",
+                "aggregation": {
+                  "@type": "none",
+                  "expression": "data_publisher.integer != 30"
+                }
+            },
+            {
+                "field_name": "relational_greater_than",
+                "aggregation": {
+                  "@type": "none",
+                  "expression": "data_publisher.integer > 30"
+                }
+            },
+            {
+                "field_name": "relational_greater_equal_than",
+                "aggregation": {
+                  "@type": "none",
+                  "expression": "30 >= data_publisher.integer"
+                }
+            },
+            {
+                "field_name": "relational_less_than",
+                "aggregation": {
+                  "@type": "none",
+                  "expression": "data_publisher.integer < 30"
+                }
+            },
+            {
+                "field_name": "relational_less_equal_than",
+                "aggregation": {
+                  "@type": "none",
+                  "expression": "data_publisher.integer <= 30"
+                }
+            },
+            {
+                "field_name": "arithmetic_add",
+                "aggregation": {
+                  "@type": "none",
+                  "expression": "data_publisher.integer + 2.5"
+                }
+            },
+            {
+                "field_name": "arithmetic_subtract",
+                "aggregation": {
+                  "@type": "none",
+                  "expression": "10 - data_publisher.integer"
+                }
+            },
+            {
+                "field_name": "arithmetic_multiply",
+                "aggregation": {
+                  "@type": "none",
+                  "expression": "7 * data_publisher.integer"
+                }
+            },
+            {
+                "field_name": "arithmetic_divide",
+                "aggregation": {
+                  "@type": "none",
+                  "expression": "data_publisher.integer / 20"
+                }
+            },
+            {
+                "field_name": "arithmetic_unary_minus",
+                "aggregation": {
+                  "@type": "none",
+                  "expression": "-data_publisher.integer"
+                }
+            },
+            {
+                "field_name": "arithmetic_modulo_trunc",
+                "aggregation": {
+                  "@type": "none",
+                  "expression": "data_publisher.integer % 7"
+                }
+            },
+            {
+                "field_name": "arithmetic_modulo_trunc_negative",
+                "aggregation": {
+                  "@type": "none",
+                  "expression": "-42 % (-data_publisher.integer)"
+                }
+            },
+            {
+                "field_name": "arithmetic_power_2",
+                "aggregation": {
+                  "@type": "none",
+                  "expression": "data_publisher.integer ** 2"
+                }
+            },
+            {
+                "field_name": "arithmetic_power_1_5",
+                "aggregation": {
+                  "@type": "none",
+                  "expression": "data_publisher.integer ** 1.5"
+                }
+            },
+            {
+              "field_name": "arithmetic_power_minus_1",
+              "aggregation": {
+                "@type": "none",
+                "expression": "data_publisher.integer ** (-1)"
+              }
+            },
+            {
+                "field_name": "arithmetic_absolute_positive",
+                "aggregation": {
+                  "@type": "none",
+                  "expression": "abs(data_publisher.integer)"
+                }
+            },
+            {
+                "field_name": "arithmetic_absolute_negative",
+                "aggregation": {
+                  "@type": "none",
+                  "expression": "abs(-data_publisher.integer)"
+                }
+            }
+          ]
+        }
+      },
+      {
+        "name": "integer_list_report",
+        "trigger_names": [
+          "periodic_1s"
+        ],
+        "message_builder": {
+          "field_assignments": [
+            {
+                "field_name": "integer_list",
+                "aggregation": {
+                  "@type": "none",
+                  "expression": "aggregations.integer_list"
+                }
+            },
+            {
+                "field_name": "relational_contains_30",
+                "aggregation": {
+                  "@type": "none",
+                  "expression": "contains(aggregations.integer_list, 30)"
+                }
+            },
+            {
+                "field_name": "relational_contains_30_0",
+                "aggregation": {
+                  "@type": "none",
+                  "expression": "contains(aggregations.integer_list, 30.0)"
+                }
+            },
+            {
+                "field_name": "relational_contains_10",
+                "aggregation": {
+                  "@type": "none",
+                  "expression": "contains(aggregations.integer_list, 10)"
+                }
+            },
+            {
+                "field_name": "relational_does_not_contain",
+                "aggregation": {
+                  "@type": "none",
+                  "expression": "doesnotcontain(aggregations.integer_list, 30)"
+                }
+            },
+            {
+                "field_name": "relational_all_equal_to",
+                "aggregation": {
+                  "@type": "none",
+                  "expression": "alleq(aggregations.integer_list, 30)"
+                }
+            }
+          ]
+        }
+      },
+      {
+        "name": "float_report",
+        "trigger_names": [
+          "periodic_1s"
+        ],
+        "message_builder": {
+          "field_assignments": [
+            {
+                "field_name": "float",
+                "aggregation": {
+                  "@type": "none",
+                  "expression": "data_publisher.float"
+                }
+            },
+            {
+                "field_name": "rounding_floor",
+                "aggregation": {
+                  "@type": "none",
+                  "expression": "floor(data_publisher.float)"
+                }
+            },
+            {
+                "field_name": "rounding_round",
+                "aggregation": {
+                  "@type": "none",
+                  "expression": "round(data_publisher.float)"
+                }
+            },
+            {
+                "field_name": "rounding_ceil",
+                "aggregation": {
+                  "@type": "none",
+                  "expression": "ceil(data_publisher.float)"
+                }
+            }
+          ]
+        }
+      },
+      {
+        "name": "boolean_report",
+        "trigger_names": [
+          "periodic_1s"
+        ],
+        "message_builder": {
+          "field_assignments": [
+            {
+              "field_name": "boolean",
+              "aggregation": {
+                "@type": "none",
+                "expression": "data_publisher.boolean"
+              }
+            },
+            {
+              "field_name": "logical_not_true",
+              "aggregation": {
+                "@type": "none",
+                "expression": "!data_publisher.boolean"
+              }
+            },
+            {
+              "field_name": "logical_not_false",
+              "aggregation": {
+                "@type": "none",
+                "expression": "!(!data_publisher.boolean)"
+              }
+            },
+            {
+              "field_name": "logical_and_true_true",
+               "aggregation": {
+                  "@type": "none",
+                  "expression": "data_publisher.boolean && data_publisher.boolean"
+                }
+            },
+            {
+              "field_name": "logical_and_true_false",
+              "aggregation": {
+                "@type": "none",
+                "expression": "data_publisher.boolean && !data_publisher.boolean"
+              }
+            },
+            {
+              "field_name": "logical_and_false_true",
+              "aggregation": {
+                "@type": "none",
+                "expression": "!data_publisher.boolean && data_publisher.boolean"
+              }
+            },
+            {
+              "field_name": "logical_and_false_false",
+              "aggregation": {
+                "@type": "none",
+                "expression": "!data_publisher.boolean && !data_publisher.boolean"
+              }
+            },
+            {
+              "field_name": "logical_or_true_true",
+              "aggregation": {
+                "@type": "none",
+                "expression": "data_publisher.boolean || data_publisher.boolean"
+              }
+            },
+            {
+              "field_name": "logical_or_true_false",
+              "aggregation": {
+                "@type": "none",
+                "expression": "data_publisher.boolean || !data_publisher.boolean"
+              }
+            },
+            {
+              "field_name": "logical_or_false_true",
+              "aggregation": {
+                "@type": "none",
+                "expression": "!data_publisher.boolean || data_publisher.boolean"
+              }
+            },
+            {
+              "field_name": "logical_or_false_false",
+              "aggregation": {
+                "@type": "none",
+                "expression": "!data_publisher.boolean || !data_publisher.boolean"
+              }
+            },
+            {
+              "field_name": "logical_xor_true_true",
+              "aggregation": {
+                "@type": "none",
+                "expression": "data_publisher.boolean ^ data_publisher.boolean"
+              }
+            },
+            {
+              "field_name": "logical_xor_true_false",
+              "aggregation": {
+                "@type": "none",
+                "expression": "data_publisher.boolean ^ !data_publisher.boolean"
+              }
+            },
+            {
+              "field_name": "logical_xor_false_true",
+              "aggregation": {
+                "@type": "none",
+                "expression": "!data_publisher.boolean ^ data_publisher.boolean"
+              }
+            },
+            {
+              "field_name": "logical_xor_false_false",
+              "aggregation": {
+                "@type": "none",
+                "expression": "!data_publisher.boolean ^ !data_publisher.boolean"
+              }
+            }
+
+          ]
+        }
+      }
+    ],
+    "vehicle_signals": "CpYBCg9vcGVyYXRvcnMucHJvdG8SHGdvb2dsZS5zZHYudGVsZW1ldHJ5X3NhbXBsZXMiXQoRT3BlcmF0b3JzVGVzdGRhdGESGAoHaW50ZWdlchgBIAEoBVIHaW50ZWdlchIUCgVmbG9hdBgCIAEoAlIFZmxvYXQSGAoHYm9vbGVhbhgDIAEoCFIHYm9vbGVhbmIGcHJvdG8z"
+}
+
+

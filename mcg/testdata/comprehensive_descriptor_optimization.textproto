@@ -1,0 +1,470 @@
+# Copyright 2026 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+uuid: "53681f77-4a07-4ed4-a6a6-f308f028e14e"
+version: 3758096386
+
+descriptor_protos {
+  name: "adhoc.proto"
+  package: "aaos.sdv.telemetry.adhoc"
+  dependency: "google/protobuf/any.proto"
+  dependency: "mcg/testdata/input_descriptors_sample/source_message.proto"
+  dependency: "mcg/testdata/vehicle_signals_sample/signals_message.proto"
+  message_type {
+    name: "adhoc_deduplicated_report_1"
+    field {
+      name: "double_val"
+      number: 1
+      type: TYPE_DOUBLE
+    }
+    field {
+      name: "enum_val"
+      number: 2
+      type: TYPE_ENUM
+      type_name: ".vehicle_signals.message.basic_enum"
+    }
+  }
+  message_type {
+    name: "comprehensive_nested_message_types_report"
+    field {
+      name: "double_field"
+      number: 1
+      type: TYPE_DOUBLE
+    }
+    field {
+      name: "enum_field"
+      number: 2
+      type: TYPE_ENUM
+      type_name: ".vehicle_signals.message.basic_enum"
+    }
+    field {
+      name: "nested_string_field"
+      number: 3
+      type: TYPE_STRING
+    }
+    field {
+      name: "nested_enum_field"
+      number: 4
+      type: TYPE_ENUM
+      type_name: ".input_descriptors.message.SourceMessage.NestedMessage.NestedEnum"
+    }
+    field {
+      name: "circular_message"
+      number: 5
+      type: TYPE_MESSAGE
+      type_name: ".google.protobuf.Any"
+    }
+    field {
+      name: "nested_int_field"
+      number: 6
+      type: TYPE_INT32
+    }
+  }
+  message_type {
+    name: "singular_double_wrapper_report"
+    field {
+      name: "value"
+      number: 1
+      type: TYPE_DOUBLE
+    }
+  }
+  syntax: "proto2"
+}
+
+
+descriptor_protos {
+  name: "mcg/testdata/input_descriptors_sample/aggregator_message.proto"
+  package: "input_descriptors.message"
+  dependency: "google/protobuf/timestamp.proto"
+  dependency: "mcg/testdata/input_descriptors_sample/circular.proto"
+  message_type {
+    name: "Message"
+    field {
+      name: "metric_id"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "metricId"
+    }
+    field {
+      name: "timestamp"
+      number: 2
+      label: LABEL_OPTIONAL
+      type: TYPE_MESSAGE
+      type_name: ".google.protobuf.Timestamp"
+      json_name: "timestamp"
+    }
+    field {
+      name: "circular_data"
+      number: 3
+      label: LABEL_OPTIONAL
+      type: TYPE_MESSAGE
+      type_name: ".input_descriptors.circular.MessageA"
+      json_name: "circularData"
+    }
+    field {
+      name: "nested_message"
+      number: 4
+      label: LABEL_OPTIONAL
+      type: TYPE_MESSAGE
+      type_name: ".input_descriptors.message.Message.NestedMessage"
+      json_name: "nestedMessage"
+    }
+    nested_type {
+      name: "NestedMessage"
+      field {
+        name: "nested_enum_field"
+        number: 1
+        label: LABEL_OPTIONAL
+        type: TYPE_ENUM
+        type_name: ".input_descriptors.message.Message.NestedMessage.NestedEnum"
+        json_name: "nestedEnumField"
+      }
+      field {
+        name: "nested_string_field"
+        number: 2
+        label: LABEL_OPTIONAL
+        type: TYPE_STRING
+        json_name: "nestedStringField"
+      }
+      enum_type {
+        name: "NestedEnum"
+        value {
+          name: "ONE"
+          number: 0
+        }
+        value {
+          name: "TWO"
+          number: 1
+        }
+        value {
+          name: "THREE"
+          number: 2
+        }
+      }
+    }
+  }
+  syntax: "proto3"
+}
+
+descriptor_protos {
+  name: "mcg/testdata/input_descriptors_sample/circular.proto"
+  package: "input_descriptors.circular"
+  message_type {
+    name: "MessageA"
+    field {
+      name: "name"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "name"
+    }
+    field {
+      name: "circular_ref"
+      number: 2
+      label: LABEL_OPTIONAL
+      type: TYPE_MESSAGE
+      type_name: ".input_descriptors.circular.MessageB"
+      json_name: "circularRef"
+    }
+  }
+  message_type {
+    name: "MessageB"
+    field {
+      name: "id"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_INT32
+      json_name: "id"
+    }
+    field {
+      name: "circular_ref"
+      number: 2
+      label: LABEL_OPTIONAL
+      type: TYPE_MESSAGE
+      type_name: ".input_descriptors.circular.MessageA"
+      json_name: "circularRef"
+    }
+  }
+  syntax: "proto3"
+}
+
+descriptor_protos {
+  name: "mcg/testdata/input_descriptors_sample/source_message.proto"
+  package: "input_descriptors.message"
+  message_type {
+    name: "SourceMessage"
+    field {
+      name: "metric_id"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "metricId"
+    }
+    field {
+      name: "nested_message"
+      number: 2
+      label: LABEL_OPTIONAL
+      type: TYPE_MESSAGE
+      type_name: ".input_descriptors.message.SourceMessage.NestedMessage"
+      json_name: "nestedMessage"
+    }
+    nested_type {
+      name: "NestedMessage"
+      field {
+        name: "nested_enum_field"
+        number: 1
+        label: LABEL_OPTIONAL
+        type: TYPE_ENUM
+        type_name: ".input_descriptors.message.SourceMessage.NestedMessage.NestedEnum"
+        json_name: "nestedEnumField"
+      }
+      field {
+        name: "nested_string_field"
+        number: 2
+        label: LABEL_OPTIONAL
+        type: TYPE_STRING
+        json_name: "nestedStringField"
+      }
+      enum_type {
+        name: "NestedEnum"
+        value {
+          name: "ONE"
+          number: 0
+        }
+        value {
+          name: "TWO"
+          number: 1
+        }
+        value {
+          name: "THREE"
+          number: 2
+        }
+      }
+    }
+  }
+  syntax: "proto3"
+}
+
+descriptor_protos {
+  name: "mcg/testdata/vehicle_signals_sample/signals_message.proto"
+  package: "vehicle_signals.message"
+  enum_type {
+    name: "basic_enum"
+    value {
+      name: "ONE"
+      number: 0
+    }
+    value {
+      name: "TWO"
+      number: 1
+    }
+    value {
+      name: "THREE"
+      number: 2
+    }
+  }
+  syntax: "proto3"
+}
+
+triggers {
+  name: "periodic_5s"
+  periodic_trigger {
+    interval {
+      seconds: 5
+    }
+  }
+}
+sources {
+  name: "aggregator_with_message_from_input_descriptors"
+  aggregator {
+    trigger_names: "periodic_5s"
+    message_builder {
+      message_type: ".input_descriptors.message.Message"
+    }
+  }
+}
+sources {
+  name: "source_with_circular_data"
+  data_source {
+    source_identifier: ".input_descriptors.circular.MessageA"
+    connection_type: SUBSCRIPTION
+  }
+}
+sources {
+  name: "source_with_message_from_input_descriptors"
+  data_source {
+    source_identifier: ".input_descriptors.message.SourceMessage"
+    connection_type: SUBSCRIPTION
+  }
+}
+sources {
+  name: "source_with_message_from_vehicle_signals"
+  data_source {
+    source_identifier: ".vehicle_signals.message.Message"
+    connection_type: SUBSCRIPTION
+  }
+}
+expression_nodes {
+  field_leaf_node {
+    source_name: "source_with_message_from_vehicle_signals"
+    field_names: "double_field"
+  }
+}
+expression_nodes {
+  field_leaf_node {
+    source_name: "source_with_message_from_vehicle_signals"
+    field_names: "enum_field"
+  }
+}
+expression_nodes {
+  field_leaf_node {
+    source_name: "source_with_message_from_input_descriptors"
+    field_names: "nested_message"
+    field_names: "nested_string_field"
+  }
+}
+expression_nodes {
+  field_leaf_node {
+    source_name: "source_with_message_from_input_descriptors"
+    field_names: "nested_message"
+    field_names: "nested_enum_field"
+  }
+}
+expression_nodes {
+  field_leaf_node {
+    source_name: "source_with_circular_data"
+  }
+}
+expression_nodes {
+  field_leaf_node {
+    source_name: "source_with_message_from_vehicle_signals"
+    field_names: "nested_message"
+    field_names: "inner_message"
+    field_names: "nested_int_field"
+  }
+}
+expression_nodes {
+  field_leaf_node {
+    source_name: "source_with_message_from_input_descriptors"
+    field_names: "metric_id"
+  }
+}
+metrics_report_configs {
+  name: "adhoc_deduplicated_report_1"
+  trigger_names: "periodic_5s"
+  message_builder {
+    message_type: ".aaos.sdv.telemetry.adhoc.adhoc_deduplicated_report_1"
+    field_assignments {
+      field_name: "double_val"
+      no_aggregation {
+        expression_node_index: 0
+      }
+    }
+    field_assignments {
+      field_name: "enum_val"
+      no_aggregation {
+        expression_node_index: 1
+      }
+    }
+  }
+}
+metrics_report_configs {
+  name: "adhoc_deduplicated_report_2"
+  trigger_names: "periodic_5s"
+  message_builder {
+    message_type: ".aaos.sdv.telemetry.adhoc.adhoc_deduplicated_report_1"
+    field_assignments {
+      field_name: "double_val"
+      no_aggregation {
+        expression_node_index: 0
+      }
+    }
+    field_assignments {
+      field_name: "enum_val"
+      no_aggregation {
+        expression_node_index: 1
+      }
+    }
+  }
+}
+metrics_report_configs {
+  name: "comprehensive_nested_message_types_report"
+  trigger_names: "periodic_5s"
+  message_builder {
+    message_type: ".aaos.sdv.telemetry.adhoc.comprehensive_nested_message_types_report"
+    field_assignments {
+      field_name: "double_field"
+      no_aggregation {
+        expression_node_index: 0
+      }
+    }
+    field_assignments {
+      field_name: "enum_field"
+      no_aggregation {
+        expression_node_index: 1
+      }
+    }
+    field_assignments {
+      field_name: "nested_string_field"
+      no_aggregation {
+        expression_node_index: 2
+      }
+    }
+    field_assignments {
+      field_name: "nested_enum_field"
+      no_aggregation {
+        expression_node_index: 3
+      }
+    }
+    field_assignments {
+      field_name: "circular_message"
+      no_aggregation {
+        expression_node_index: 4
+      }
+    }
+    field_assignments {
+      field_name: "nested_int_field"
+      no_aggregation {
+        expression_node_index: 5
+      }
+    }
+  }
+}
+metrics_report_configs {
+  name: "explicit_message_type_report"
+  trigger_names: "periodic_5s"
+  message_builder {
+    message_type: ".input_descriptors.message.Message"
+    field_assignments {
+      field_name: "metric_id"
+      no_aggregation {
+        expression_node_index: 6
+      }
+    }
+  }
+}
+metrics_report_configs {
+  name: "singular_double_wrapper_report"
+  trigger_names: "periodic_5s"
+  message_builder {
+    message_type: ".aaos.sdv.telemetry.adhoc.singular_double_wrapper_report"
+    field_assignments {
+      field_name: "value"
+      no_aggregation {
+        expression_node_index: 0
+      }
+    }
+  }
+}

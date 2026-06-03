@@ -1,0 +1,46 @@
+{
+  "existing_uuid": "869d6a70-9e91-4443-be20-647f42fdb4ee",
+  "triggers": [
+    {
+      "name": "rpc_report_trigger",
+      "periodic": {
+        "period_ms": 1000
+      }
+    }
+  ],
+  "data_source_message_types": {
+    "com.sdv.google.sample.apex.provider.Provider#TireStatus|com-sdv-google-sample-apex-provider-tire-status": ".com.sdv.google.sample.apex.provider.GetTirePressureResponse"
+  },
+  "data_sources": [
+    {
+      "name": "rpc_tire_pressure_publisher",
+      "source_identifier": "com.sdv.google.sample.apex.provider.Provider#TireStatus|com-sdv-google-sample-apex-provider-tire-status",
+      "connection_type": "ON_DEMAND",
+      "configuration": {
+        "type_url": "type.googleapis.com/com.sdv.google.sample.apex.provider.GetTireStatusRequest",
+        "value_textproto": "tire: FRONT_LEFT"
+      }
+    }
+  ],
+  "report_configs": [
+    {
+      "name": "TirePressureReport",
+      "trigger_names": [
+        "rpc_report_trigger"
+      ],
+      "message_builder": {
+        "field_assignments": [
+          {
+            "field_name": "tire_pressure_fl",
+            "aggregation": {
+              "@type": "none",
+              "expression": "rpc_tire_pressure_publisher.pressure"
+            }
+          }
+        ]
+      }
+    }
+  ],
+  "_vehicle_signals_generated_by": "protoc rpc.proto -I. --descriptor_set_out=rpc.pb",
+  "vehicle_signals": "CscFCglycGMucHJvdG8SI2NvbS5zZHYuZ29vZ2xlLnNhbXBsZS5hcGV4LnByb3ZpZGVyGhlnb29nbGUvcHJvdG9idWYvYW55LnByb3RvIl0KFEdldFRpcmVTdGF0dXNSZXF1ZXN0EkUKBHRpcmUYASABKA4yMS5jb20uc2R2Lmdvb2dsZS5zYW1wbGUuYXBleC5wcm92aWRlci5UaXJlTG9jYXRpb25SBHRpcmUilAEKF0dldFRpcmVQcmVzc3VyZVJlc3BvbnNlEkUKBHRpcmUYASABKA4yMS5jb20uc2R2Lmdvb2dsZS5zYW1wbGUuYXBleC5wcm92aWRlci5UaXJlTG9jYXRpb25SBHRpcmUSGgoIcHJlc3N1cmUYAiABKA1SCHByZXNzdXJlEhYKBmNhbGxlchgDIAEoCVIGY2FsbGVyKk4KDFRpcmVMb2NhdGlvbhIOCgpGUk9OVF9MRUZUEAASDwoLRlJPTlRfUklHSFQQARINCglSRUFSX0xFRlQQAhIOCgpSRUFSX1JJR0hUEAMyqwIKClRpcmVTdGF0dXMSjAEKD0dldFRpcmVQcmVzc3VyZRI5LmNvbS5zZHYuZ29vZ2xlLnNhbXBsZS5hcGV4LnByb3ZpZGVyLkdldFRpcmVTdGF0dXNSZXF1ZXN0GjwuY29tLnNkdi5nb29nbGUuc2FtcGxlLmFwZXgucHJvdmlkZXIuR2V0VGlyZVByZXNzdXJlUmVzcG9uc2UiABKNAQoQR2V0TGF0ZXN0TWVzc2FnZRI5LmNvbS5zZHYuZ29vZ2xlLnNhbXBsZS5hcGV4LnByb3ZpZGVyLkdldFRpcmVTdGF0dXNSZXF1ZXN0GjwuY29tLnNkdi5nb29nbGUuc2FtcGxlLmFwZXgucHJvdmlkZXIuR2V0VGlyZVByZXNzdXJlUmVzcG9uc2UiAGIGcHJvdG8z"
+}

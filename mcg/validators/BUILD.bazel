@@ -1,0 +1,62 @@
+# Copyright 2024 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+load("@rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "validators",
+    srcs = [
+        "doc.go",
+        "graph_factory.go",
+        "mc_validator.go",
+        "shallow_validators.go",
+    ],
+    importpath = "sdv.googlesource.com/mcg/mcg/validators",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//mcg/errors",
+        "//mcg/expressions",
+        "//mcg/graph",
+        "//mcg/mcuuid",
+        "//mcg/session",
+        "//mcg/type_resolvers",
+        "//third_party/aosp/sdv/telemetry/metrics_configuration:telemetry_go_proto",
+        "@org_golang_google_protobuf//reflect/protoreflect",
+    ],
+)
+
+go_test(
+    name = "validators_test",
+    size = "small",
+    srcs = [
+        "export_test.go",
+        "mc_validator_test.go",
+        "shallow_validator_test.go",
+    ],
+    data = [
+        "//mcg/testdata:exported_testdata",
+    ],
+    embed = [":validators"],
+    deps = [
+        "//mcg/constants",
+        "//mcg/errors",
+        "//mcg/session",
+        "//third_party/aosp/sdv/telemetry/metrics_configuration:telemetry_go_proto",
+        "@com_github_google_go_cmp//cmp",
+        "@com_github_google_uuid//:uuid",
+        "@org_golang_google_protobuf//encoding/prototext",
+        "@org_golang_google_protobuf//proto",
+        "@org_golang_google_protobuf//types/known/durationpb",
+    ],
+)

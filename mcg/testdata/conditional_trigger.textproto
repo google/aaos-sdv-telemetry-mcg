@@ -1,0 +1,279 @@
+# Copyright 2025 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+version: 3758096386
+expression_nodes {
+  constant_leaf_node {
+    bool_value: true
+  }
+}
+stop_trigger_name: "parent_trigger"
+start_trigger_name: "parent_trigger"
+triggers {
+  name: "parent_trigger"
+  periodic_trigger {
+    interval {
+      seconds: 1
+      nanos: 200000000
+    }
+  }
+}
+
+triggers {
+  name: "is_true"
+  conditional_trigger {
+    trigger_names: "parent_trigger"
+    selector_node_index: 0
+    is_true {
+    }
+  }
+}
+
+triggers {
+  name: "is_false"
+  conditional_trigger {
+    trigger_names: "parent_trigger"
+    selector_node_index: 0
+    is_false {
+    }
+  }
+}
+
+triggers {
+  name: "rising_edge"
+  conditional_trigger {
+    trigger_names: "parent_trigger"
+    selector_node_index: 0
+    rising_edge {
+    }
+  }
+}
+triggers {
+  name: "rising_edge_empty_edge_options"
+  conditional_trigger {
+    trigger_names: "parent_trigger"
+    selector_node_index: 0
+    rising_edge {
+      rising_options {
+        min_duration {
+        }
+      }
+    }
+  }
+}
+triggers {
+  name: "rising_edge_edge_options_1"
+  conditional_trigger {
+    trigger_names: "parent_trigger"
+    selector_node_index: 0
+    rising_edge {
+      rising_options {
+        min_duration {
+          nanos: 123000000
+        }
+      }
+    }
+  }
+}
+triggers {
+  name: "rising_edge_edge_options_2"
+  conditional_trigger {
+    trigger_names: "parent_trigger"
+    selector_node_index: 0
+    rising_edge {
+      rising_options {
+        min_duration {
+          nanos: 123000000
+        }
+        require_exact: true
+      }
+    }
+  }
+}
+
+triggers {
+  name: "falling_edge"
+  conditional_trigger {
+    trigger_names: "parent_trigger"
+    selector_node_index: 0
+    falling_edge {
+    }
+  }
+}
+triggers {
+  name: "falling_edge_empty_edge_options"
+  conditional_trigger {
+    trigger_names: "parent_trigger"
+    selector_node_index: 0
+    falling_edge {
+      falling_options {
+        min_duration {
+        }
+      }
+    }
+  }
+}
+triggers {
+  name: "falling_edge_edge_options_1"
+  conditional_trigger {
+    trigger_names: "parent_trigger"
+    selector_node_index: 0
+    falling_edge {
+      falling_options {
+        min_duration {
+          nanos: 123000000
+        }
+      }
+    }
+  }
+}
+triggers {
+  name: "falling_edge_edge_options_2"
+  conditional_trigger {
+    trigger_names: "parent_trigger"
+    selector_node_index: 0
+    falling_edge {
+      falling_options {
+        min_duration {
+          nanos: 123000000
+        }
+        require_exact: true
+      }
+    }
+  }
+}
+
+triggers {
+  name: "all_changes"
+  conditional_trigger {
+    trigger_names: "parent_trigger"
+    selector_node_index: 0
+    all_changes {
+    }
+  }
+}
+triggers {
+  name: "all_changes_empty_edge_options"
+  conditional_trigger {
+    trigger_names: "parent_trigger"
+    selector_node_index: 0
+    all_changes {
+      rising_options {
+        min_duration {
+        }
+      }
+      falling_options {
+        min_duration {
+        }
+      }
+    }
+  }
+}
+triggers {
+  name: "all_changes_edge_options_1"
+  conditional_trigger {
+    trigger_names: "parent_trigger"
+    selector_node_index: 0
+    all_changes {
+      rising_options {
+        min_duration {
+          nanos: 123000000
+        }
+      }
+    }
+  }
+}
+triggers {
+  name: "all_changes_edge_options_2"
+  conditional_trigger {
+    trigger_names: "parent_trigger"
+    selector_node_index: 0
+    all_changes {
+      rising_options {
+        min_duration {
+          nanos: 123000000
+        }
+        require_exact: true
+      }
+    }
+  }
+}
+triggers {
+  name: "all_changes_edge_options_3"
+  conditional_trigger {
+    trigger_names: "parent_trigger"
+    selector_node_index: 0
+    all_changes {
+      falling_options {
+        min_duration {
+          nanos: 123000000
+        }
+      }
+    }
+  }
+}
+triggers {
+  name: "all_changes_edge_options_4"
+  conditional_trigger {
+    trigger_names: "parent_trigger"
+    selector_node_index: 0
+    all_changes {
+      falling_options {
+        min_duration {
+          nanos: 123000000
+        }
+        require_exact: true
+      }
+    }
+  }
+}
+triggers {
+  name: "all_changes_edge_options_5"
+  conditional_trigger {
+    trigger_names: "parent_trigger"
+    selector_node_index: 0
+    all_changes {
+      rising_options {
+        min_duration {
+          nanos: 123000000
+        }
+      }
+      falling_options {
+        min_duration {
+          nanos: 456000000
+        }
+      }
+    }
+  }
+}
+triggers {
+  name: "all_changes_edge_options_6"
+  conditional_trigger {
+    trigger_names: "parent_trigger"
+    selector_node_index: 0
+    all_changes {
+      rising_options {
+        min_duration {
+          nanos: 123000000
+        }
+      }
+      falling_options {
+        min_duration {
+          nanos: 456000000
+        }
+        require_exact: true
+      }
+    }
+  }
+}

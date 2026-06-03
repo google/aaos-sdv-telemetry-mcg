@@ -1,0 +1,141 @@
+version: 3758096386
+descriptor_protos {
+  name: "adhoc.proto"
+  package: "aaos.sdv.telemetry.adhoc"
+  message_type {
+    name: "time_series"
+    field {
+      name: "latitude"
+      number: 1
+      type: TYPE_INT32
+    }
+    field {
+      name: "longitude"
+      number: 2
+      type: TYPE_INT32
+    }
+    field {
+      name: "altitude"
+      number: 3
+      type: TYPE_INT32
+    }
+    field {
+      name: "timestamp"
+      number: 4
+      type: TYPE_INT64
+    }
+  }
+  message_type {
+    name: "time_series_agg"
+    field {
+      name: "values"
+      number: 1
+      label: LABEL_REPEATED
+      type: TYPE_MESSAGE
+      type_name: ".aaos.sdv.telemetry.adhoc.time_series"
+    }
+  }
+  syntax: "proto2"
+}
+triggers {
+  name: "periodic_trigger"
+  periodic_trigger {
+    interval {
+      seconds: 1
+    }
+  }
+}
+triggers {
+  name: "time_series_new_data_trigger"
+  data_trigger {
+    source_name: "time_series"
+  }
+}
+sources {
+  name: "location_getter"
+  data_source {
+    source_identifier: "LocationService"
+    connection_type: ON_DEMAND
+  }
+}
+sources {
+  name: "time_series"
+  aggregator {
+    trigger_names: "periodic_trigger"
+    message_builder {
+      message_type: ".aaos.sdv.telemetry.adhoc.time_series"
+      field_assignments {
+        field_name: "latitude"
+        no_aggregation {
+          expression_node_index: 0
+        }
+      }
+      field_assignments {
+        field_name: "longitude"
+        no_aggregation {
+          expression_node_index: 1
+        }
+      }
+      field_assignments {
+        field_name: "altitude"
+        no_aggregation {
+          expression_node_index: 2
+        }
+      }
+      field_assignments {
+        field_name: "timestamp"
+        no_aggregation {
+          expression_node_index: 3
+        }
+      }
+    }
+  }
+}
+sources {
+  name: "time_series_agg"
+  aggregator {
+    trigger_names: "time_series_new_data_trigger"
+    message_builder {
+      message_type: ".aaos.sdv.telemetry.adhoc.time_series_agg"
+      field_assignments {
+        field_name: "values"
+        vector_aggregation {
+          expression_node_index: 4
+          max_length: 100
+        }
+      }
+    }
+  }
+}
+# Expression Node 0
+expression_nodes {
+  constant_leaf_node {
+    int32_value: 1
+  }
+}
+# Expression Node 1
+expression_nodes {
+  constant_leaf_node {
+    int32_value: 2
+  }
+}
+# Expression Node 2
+expression_nodes {
+  constant_leaf_node {
+    int32_value: 3
+  }
+}
+# Expression Node 3
+expression_nodes {
+  function_leaf_node {
+    get_current_timestamp {
+      time_source: REALTIME_CLOCK
+    }
+  }
+}
+# Expression Node 4
+expression_nodes {
+  field_leaf_node {
+    source_name: "time_series"
+  }
+}

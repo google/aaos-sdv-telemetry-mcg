@@ -1,0 +1,42 @@
+{
+  "data_source_message_types": {
+    "AServiceName::FRONT_LEFT": "google.protobuf.UInt64Value"
+  },
+  "data_sources": [
+    {
+      "name": "data_source",
+      "source_identifier": "AServiceName::FRONT_LEFT"
+    }
+  ],
+  "aggregators": [
+    {
+      "name": "aggregator",
+      "reset_on_get": false,
+      "trigger_names": [
+        "some_trigger"
+      ],
+      "message_builder": {
+        "field_assignments": [
+          {
+            "field_name": "data",
+            "aggregation": {
+              "@type": "none",
+              "expression": "data_source.value"
+            }
+          }
+        ]
+      }
+    }
+  ],
+  "triggers": [
+    {
+      "name": "some_trigger",
+      "periodic": {
+        "period_ms": 1200
+      }
+    }
+  ],
+  "stop_trigger_name": "some_trigger",
+  "start_trigger_name": "some_trigger",
+  "report_configs": []
+}

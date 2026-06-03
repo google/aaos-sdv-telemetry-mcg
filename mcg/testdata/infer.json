@@ -1,0 +1,176 @@
+{
+  "triggers": [
+    {
+      "name": "periodic_5s",
+      "periodic": {
+        "period_ms": 5000
+      }
+    },
+    {
+      "name": "trip_state_trigger",
+      "data": {
+        "source_name": "trip_state_publisher"
+      }
+    },
+    {
+      "name": "trip_end",
+      "conditional": {
+        "triggers": ["trip_state_trigger"],
+        "condition_type": {
+          "is_true": {}
+        },
+        "expression": "trip_state_publisher.trigger_value"
+      }
+    }
+  ],
+  "stop_trigger_name": "trip_end",
+  "start_trigger_name": "periodic_5s",
+  "data_sources": [
+    {
+      "name": "trip_state_publisher",
+      "source_identifier": ".mcg.test.subpkg.trigger_msg"
+    },
+    {
+      "name": "speed",
+      "source_identifier": ".mcg.test.car_speed_msg"
+    },
+    {
+      "name": "speed_report",
+      "source_identifier": ".mcg.test.report.speed_report"
+    }
+  ],
+  "aggregators": [
+    {
+      "name": "aggregations",
+      "trigger_names": ["periodic_5s"],
+      "reset_on_get": true,
+      "message_builder": {
+        "field_assignments": [
+          {
+            "field_name": "none_meters_per_hour",
+            "aggregation": {
+              "@type": "none",
+              "expression": "speed.speed"
+            }
+          },
+          {
+            "field_name": "vector_meters_per_hour",
+            "aggregation": {
+              "@type": "vector",
+              "expression": "speed.speed"
+            }
+          },
+          {
+            "field_name": "max_meters_per_hour",
+            "aggregation": {
+              "@type": "max",
+              "expression": "speed.speed"
+            }
+          },
+          {
+            "field_name": "min_meters_per_hour",
+            "aggregation": {
+              "@type": "min",
+              "expression": "speed.sample_int"
+            }
+          },
+          {
+            "field_name": "avg_meters_per_hour",
+            "aggregation": {
+              "@type": "avg",
+              "expression": "speed.sample_int"
+            }
+          },
+          {
+            "field_name": "count_meters_per_hour",
+            "aggregation": {
+              "@type": "count"
+            }
+          },
+          {
+            "field_name": "sum_meters_per_hour",
+            "aggregation": {
+              "@type": "sum",
+              "expression": "speed.sample_int"
+            }
+          },
+          {
+            "field_name": "stddev_meters_per_hour",
+            "aggregation": {
+              "@type": "stddev",
+              "expression": "speed.sample_int"
+            }
+          },
+          {
+            "field_name": "delta_meters_per_hour",
+            "aggregation": {
+              "@type": "delta",
+              "expression": "speed.sample_int"
+            }
+          }
+        ]
+      }
+    }
+  ],
+  "report_configs": [
+    {
+      "name": "max_avg_cur",
+      "trigger_names": ["trip_end"],
+      "report_incomplete": true,
+      "message_builder": {
+        "field_assignments": [
+          {
+            "field_name": "avg_meters_per_hour_rep",
+            "aggregation": {
+              "@type": "none",
+              "expression": "aggregations.avg_meters_per_hour  + 1"
+            }
+          },
+          {
+            "field_name": "max_meters_per_hour_rep",
+            "aggregation": {
+              "@type": "none",
+              "expression": "aggregations.max_meters_per_hour"
+            }
+          },
+          {
+            "field_name": "cur_meters_per_hour_rep",
+            "aggregation": {
+              "@type": "none",
+              "expression": "speed.sample_float"
+            }
+          },
+          {
+            "field_name": "min_meters_per_hour_rep",
+            "aggregation": {
+              "@type": "none",
+              "expression": "aggregations.min_meters_per_hour"
+            }
+          },
+          {
+            "field_name": "speed_msg_list",
+            "aggregation": {
+              "@type": "none",
+              "expression": "speed_report.car_speed_list.speed_msg"
+            }
+          },
+          {
+            "field_name": "speed_enum_field",
+            "aggregation": {
+              "@type": "none",
+              "expression": "speed.unit"
+            }
+          },
+          {
+            "field_name": "source_without_field_specified",
+            "aggregation": {
+              "@type": "none",
+              "expression": "speed"
+            }
+          }
+        ]
+      }
+    }
+  ],
+  "vehicle_signals": "CuADCjhtY2cvdGVzdGRhdGEvdmVoaWNsZV9zaWduYWxzX3NhbXBsZS9zcGVjaWZpY19zcGVlZC5wcm90bxIIbWNnLnRlc3QaPW1jZy90ZXN0ZGF0YS92ZWhpY2xlX3NpZ25hbHNfc2FtcGxlL3N1YnBrZy9zYW1wbGVfc3BlZWQucHJvdG8iWQoQZW5naW5lX3NwZWVkX21zZxIUCgVzcGVlZBgBIAEoAVIFc3BlZWQSLwoEdW5pdBgCIAEoDjIbLm1jZy50ZXN0LnN1YnBrZy5zcGVlZF91bml0UgR1bml0IpgBCg1jYXJfc3BlZWRfbXNnEhQKBXNwZWVkGAEgASgBUgVzcGVlZBIvCgR1bml0GAIgASgOMhsubWNnLnRlc3Quc3VicGtnLnNwZWVkX3VuaXRSBHVuaXQSHQoKc2FtcGxlX2ludBgDIAEoBVIJc2FtcGxlSW50EiEKDHNhbXBsZV9mbG9hdBgEIAEoAlILc2FtcGxlRmxvYXQiXQoUbGVmdF93aGVlbF9zcGVlZF9tc2cSFAoFc3BlZWQYASABKAFSBXNwZWVkEi8KBHVuaXQYAiABKA4yGy5tY2cudGVzdC5zdWJwa2cuc3BlZWRfdW5pdFIEdW5pdGIGcHJvdG8zCqwFCkRtY2cvdGVzdGRhdGEvdmVoaWNsZV9zaWduYWxzX3NhbXBsZS9yZXBvcnQvc2FtcGxlX3NwZWVkX3JlcG9ydC5wcm90bxIPbWNnLnRlc3QucmVwb3J0GjhtY2cvdGVzdGRhdGEvdmVoaWNsZV9zaWduYWxzX3NhbXBsZS9zcGVjaWZpY19zcGVlZC5wcm90bxpCbWNnL3Rlc3RkYXRhL3ZlaGljbGVfc2lnbmFsc19zYW1wbGUvc3VicGtnL3NhbXBsZV9zcGVlZF9saXN0LnByb3RvIswDCgxzcGVlZF9yZXBvcnQSPgoNYXZnX2VuZ19zcGVlZBgBIAEoCzIaLm1jZy50ZXN0LmVuZ2luZV9zcGVlZF9tc2dSC2F2Z0VuZ1NwZWVkEj4KDW1heF9lbmdfc3BlZWQYAiABKAsyGi5tY2cudGVzdC5lbmdpbmVfc3BlZWRfbXNnUgttYXhFbmdTcGVlZBI+Cg1taW5fZW5nX3NwZWVkGAMgASgLMhoubWNnLnRlc3QuZW5naW5lX3NwZWVkX21zZ1ILbWluRW5nU3BlZWQSOwoNYXZnX2Nhcl9zcGVlZBgEIAEoCzIXLm1jZy50ZXN0LmNhcl9zcGVlZF9tc2dSC2F2Z0NhclNwZWVkEjsKDW1heF9jYXJfc3BlZWQYBSABKAsyFy5tY2cudGVzdC5jYXJfc3BlZWRfbXNnUgttYXhDYXJTcGVlZBI7Cg1taW5fY2FyX3NwZWVkGAYgASgLMhcubWNnLnRlc3QuY2FyX3NwZWVkX21zZ1ILbWluQ2FyU3BlZWQSRQoOY2FyX3NwZWVkX2xpc3QYByABKAsyHy5tY2cudGVzdC5zdWJwa2cuc3BlZWRfbXNnX2xpc3RSDGNhclNwZWVkTGlzdGIGcHJvdG8zCt0BCj1tY2cvdGVzdGRhdGEvdmVoaWNsZV9zaWduYWxzX3NhbXBsZS9zdWJwa2cvc2FtcGxlX3NwZWVkLnByb3RvEg9tY2cudGVzdC5zdWJwa2ciUgoJc3BlZWRfbXNnEhQKBXNwZWVkGAEgASgBUgVzcGVlZBIvCgR1bml0GAIgASgOMhsubWNnLnRlc3Quc3VicGtnLnNwZWVkX3VuaXRSBHVuaXQqLwoKc3BlZWRfdW5pdBIKCgZNRVRSSUMQABIMCghJTVBFUklBTBABEgcKA1JQTRACYgZwcm90bzMK5wEKQm1jZy90ZXN0ZGF0YS92ZWhpY2xlX3NpZ25hbHNfc2FtcGxlL3N1YnBrZy9zYW1wbGVfc3BlZWRfbGlzdC5wcm90bxIPbWNnLnRlc3Quc3VicGtnGj1tY2cvdGVzdGRhdGEvdmVoaWNsZV9zaWduYWxzX3NhbXBsZS9zdWJwa2cvc2FtcGxlX3NwZWVkLnByb3RvIkkKDnNwZWVkX21zZ19saXN0EjcKCXNwZWVkX21zZxgBIAMoCzIaLm1jZy50ZXN0LnN1YnBrZy5zcGVlZF9tc2dSCHNwZWVkTXNnYgZwcm90bzMKjgEKP21jZy90ZXN0ZGF0YS92ZWhpY2xlX3NpZ25hbHNfc2FtcGxlL3N1YnBrZy9zYW1wbGVfdHJpZ2dlci5wcm90bxIPbWNnLnRlc3Quc3VicGtnIjIKC3RyaWdnZXJfbXNnEiMKDXRyaWdnZXJfdmFsdWUYASABKAhSDHRyaWdnZXJWYWx1ZWIGcHJvdG8z"
+}

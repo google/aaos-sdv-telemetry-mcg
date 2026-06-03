@@ -1,0 +1,103 @@
+# Copyright 2024 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+load("@aspect_bazel_lib//lib:jq.bzl", "jq")
+load("@bazel_skylib//rules:diff_test.bzl", "diff_test")
+load("@bazel_skylib//rules:write_file.bzl", "write_file")
+load("@rules_go//go:def.bzl", "go_library", "go_test")
+load("@rules_shell//shell:sh_test.bzl", "sh_test")
+load("@yq.bzl//:yq.bzl", "yq")
+
+go_library(
+    name = "docs",
+    srcs = [
+        "openapi.go",
+        "routes.go",
+    ],
+    embedsrcs = ["openapi.yaml"],
+    importpath = "sdv.googlesource.com/mcg/mcg/docs",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//mcg/swaggerui",
+        "@com_github_gin_gonic_gin//:gin",
+        "@in_gopkg_yaml_v3//:yaml_v3",
+    ],
+)
+
+yq(
+    name = "openapi_yaml",
+    srcs = ["openapi.template.yaml"],
+    outs = ["openapi.yaml"],
+    expression = ".info.version = \"%s\"" % module_version(),
+)
+
+yq(
+    name = "openapi_json",
+    testonly = True,
+    srcs = [":openapi_yaml"],
+    outs = ["openapi.json"],
+    args = ["-o=json"],
+)
+
+jq(
+    name = "openapi_title_and_version",
+    testonly = True,
+    srcs = ["openapi.json"],
+    out = "openapi_title_and_version.json",
+    filter = "{title: .info.title, version: .info.version}",
+)
+
+write_file(
+    name = "expected_openapi_title_and_version",
+    testonly = True,
+    out = "expected_openapi_title_and_version.json",
+    content = [
+        "{",
+        "  \"title\": \"Metrics Config Generator\",",
+        "  \"version\": \"%s\"" % module_version(),
+        "}",
+        "",
+    ],
+    newline = "unix",
+)
+
+# This checks that Swaggo correctly parses at least the basic information we
+# provide (title and version). In the past, Swaggo silently failed to do so.
+diff_test(
+    name = "docs_generate_correctly",
+    size = "small",
+    file1 = ":expected_openapi_title_and_version",
+    file2 = ":openapi_title_and_version",
+)
+
+go_test(
+    name = "docs_test",
+    size = "small",
+    srcs = ["openapi_test.go"],
+    deps = [
+        ":docs",
+        "@in_gopkg_yaml_v3//:yaml_v3",
+    ],
+)
+
+sh_test(
+    name = "validate_openapi_spec",
+    size = "small",
+    srcs = ["validate_openapi_spec.sh"],
+    data = [
+        ":openapi_yaml",
+        "//tools:openapi-cli",
+    ],
+    deps = ["@rules_shell//shell/runfiles"],
+)

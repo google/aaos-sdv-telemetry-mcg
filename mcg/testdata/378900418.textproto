@@ -1,0 +1,118 @@
+# Copyright 2024 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+version: 3758096386
+descriptor_protos {
+  name: "adhoc.proto"
+  package: "aaos.sdv.telemetry.adhoc"
+  message_type {
+    name: "tmstmp_name_081cff19_f150_4b62_aaad_6ddc40074cdd"
+    field {
+      name: "timestamp"
+      number: 1
+      type: TYPE_INT64
+    }
+  }
+  message_type {
+    name: "pub_name_4bf24dac_473a_46a9_a3b0_4ecdec022569"
+    field {
+      name: "data"
+      number: 1
+      type: TYPE_INT64
+    }
+  }
+  syntax: "proto2"
+}
+triggers {
+  name: "some_trigger"
+  periodic_trigger {
+    interval {
+      seconds: 1
+      nanos: 200000000
+    }
+  }
+}
+sources {
+  name: "tmstmp_name_081cff19_f150_4b62_aaad_6ddc40074cdd"
+  aggregator {
+    trigger_names: "some_trigger"
+    message_builder {
+      message_type: ".aaos.sdv.telemetry.adhoc.tmstmp_name_081cff19_f150_4b62_aaad_6ddc40074cdd"
+      field_assignments {
+        field_name: "timestamp"
+        no_aggregation {
+          expression_node_index: 0
+        }
+      }
+    }
+  }
+}
+sources {
+  name: "tmstmp_name_2aea64f3_c334_43af_a799_584f22f4d4f0"
+  aggregator {
+    trigger_names: "some_trigger"
+    message_builder {
+      message_type: ".aaos.sdv.telemetry.adhoc.tmstmp_name_081cff19_f150_4b62_aaad_6ddc40074cdd"
+      field_assignments {
+        field_name: "timestamp"
+        no_aggregation {
+          expression_node_index: 0
+        }
+      }
+    }
+  }
+}
+sources {
+  name: "pub_name_4bf24dac_473a_46a9_a3b0_4ecdec022569"
+  aggregator {
+    trigger_names: "some_trigger"
+    message_builder {
+      message_type: ".aaos.sdv.telemetry.adhoc.pub_name_4bf24dac_473a_46a9_a3b0_4ecdec022569"
+      field_assignments {
+        field_name: "data"
+        no_aggregation {
+          expression_node_index: 3
+        }
+      }
+    }
+  }
+}
+expression_nodes {
+  function_leaf_node {
+    get_current_timestamp {
+      time_source: REALTIME_CLOCK
+    }
+  }
+}
+expression_nodes {
+  field_leaf_node {
+    source_name: "tmstmp_name_2aea64f3_c334_43af_a799_584f22f4d4f0"
+    field_names: "timestamp"
+  }
+}
+expression_nodes {
+  field_leaf_node {
+    source_name: "tmstmp_name_081cff19_f150_4b62_aaad_6ddc40074cdd"
+    field_names: "timestamp"
+  }
+}
+expression_nodes {
+  combination_node {
+    left_index: 1
+    right_index: 2
+    arithmetic_operator: SUBTRACT
+  }
+}
+start_trigger_name: "some_trigger"
+stop_trigger_name: "some_trigger"
