@@ -57,29 +57,29 @@ paths:
               schema:
                 type: string
           content:
-            application/x-protobuf;proto=android.sdv.telemetry.MetricsConfig:
+            application/x-protobuf;proto=google.sdv.telemetry.MetricsConfig:
               schema:
                 type: object
-            text/x-protobuf;proto=android.sdv.telemetry.MetricsConfig:
+            text/x-protobuf;proto=google.sdv.telemetry.MetricsConfig;charset=utf-8:
               schema:
                 type: object
                 description: Legacy textproto format
         "400":
           description: "INVALID_ARGUMENT: Various data validation errors"
           content:
-            application/x-protobuf;proto=android.sdv.telemetry.MetricsConfig:
+            application/x-protobuf;proto=google.sdv.telemetry.MetricsConfig:
               schema:
                 $ref: "#/components/schemas/errors.JsonErrorResponse"
-            text/x-protobuf;proto=android.sdv.telemetry.MetricsConfig:
+            text/x-protobuf;proto=google.sdv.telemetry.MetricsConfig;charset=utf-8:
               schema:
                 $ref: "#/components/schemas/errors.JsonErrorResponse"
         "500":
           description: "INTERNAL: Internal errors"
           content:
-            application/x-protobuf;proto=android.sdv.telemetry.MetricsConfig:
+            application/x-protobuf;proto=google.sdv.telemetry.MetricsConfig:
               schema:
                 $ref: "#/components/schemas/errors.JsonErrorResponse"
-            text/x-protobuf;proto=android.sdv.telemetry.MetricsConfig:
+            text/x-protobuf;proto=google.sdv.telemetry.MetricsConfig;charset=utf-8:
               schema:
                 $ref: "#/components/schemas/errors.JsonErrorResponse"
       x-codegen-request-body-name: body
@@ -89,10 +89,10 @@ paths:
       requestBody:
         description: Metrics config textproto
         content:
-          application/x-protobuf;proto=android.sdv.telemetry.MetricsConfig:
+          application/x-protobuf;proto=google.sdv.telemetry.MetricsConfig:
             schema:
               type: string
-          text/x-protobuf;proto=android.sdv.telemetry.MetricsConfig:
+          text/x-protobuf;proto=google.sdv.telemetry.MetricsConfig;charset=utf-8:
             schema:
               type: string
               description: Legacy textproto format
@@ -101,19 +101,19 @@ paths:
         "200":
           description: FileDescriptorSet
           content:
-            application/x-protobuf;google.protobuf.FileDescriptorSet:
+            application/x-protobuf;proto=google.protobuf.FileDescriptorSet:
               schema:
                 type: object
-            text/x-protobuf;proto=google.protobuf.FileDescriptorSet:
+            text/x-protobuf;proto=google.protobuf.FileDescriptorSet;charset=utf-8:
               schema:
                 type: object
         "400":
           description: "INVALID_ARGUMENT: Invalid Metrics config."
           content:
-            application/x-protobuf;google.protobuf.FileDescriptorSet:
+            application/x-protobuf;proto=google.protobuf.FileDescriptorSet:
               schema:
                 $ref: "#/components/schemas/errors.JsonErrorResponse"
-            text/x-protobuf;proto=google.protobuf.FileDescriptorSet:
+            text/x-protobuf;proto=google.protobuf.FileDescriptorSet;charset=utf-8:
               schema:
                 $ref: "#/components/schemas/errors.JsonErrorResponse"
   /api/v1/validate_metrics_config:
@@ -132,10 +132,10 @@ paths:
       requestBody:
         description: Metrics config textproto
         content:
-          application/x-protobuf;proto=android.sdv.telemetry.MetricsConfig:
+          application/x-protobuf;proto=google.sdv.telemetry.MetricsConfig:
             schema:
               type: string
-          text/x-protobuf;proto=android.sdv.telemetry.MetricsConfig:
+          text/x-protobuf;proto=google.sdv.telemetry.MetricsConfig;charset=utf-8:
             schema:
               type: string
               description: Legacy textproto format
@@ -279,28 +279,28 @@ paths:
               schema:
                 type: string
           content:
-            application/x-protobuf;proto=android.sdv.telemetry.MetricsConfig:
+            application/x-protobuf;proto=google.sdv.telemetry.MetricsConfig:
               schema:
                 type: object
-            text/x-protobuf;proto=android.sdv.telemetry.MetricsConfig:
+            text/x-protobuf;proto=google.sdv.telemetry.MetricsConfig;charset=utf-8:
               schema:
                 type: object
         "400":
           description: "INVALID_ARGUMENT: Various data validation errors"
           content:
-            application/x-protobuf;proto=android.sdv.telemetry.MetricsConfig:
+            application/x-protobuf;proto=google.sdv.telemetry.MetricsConfig:
               schema:
                 $ref: "#/components/schemas/errors.JsonErrorResponse"
-            text/x-protobuf;proto=android.sdv.telemetry.MetricsConfig:
+            text/x-protobuf;proto=google.sdv.telemetry.MetricsConfig;charset=utf-8:
               schema:
                 $ref: "#/components/schemas/errors.JsonErrorResponse"
         "500":
           description: "INTERNAL: Internal errors"
           content:
-            application/x-protobuf;proto=android.sdv.telemetry.MetricsConfig:
+            application/x-protobuf;proto=google.sdv.telemetry.MetricsConfig:
               schema:
                 $ref: "#/components/schemas/errors.JsonErrorResponse"
-            text/x-protobuf;proto=android.sdv.telemetry.MetricsConfig:
+            text/x-protobuf;proto=google.sdv.telemetry.MetricsConfig;charset=utf-8:
               schema:
                 $ref: "#/components/schemas/errors.JsonErrorResponse"
       x-codegen-request-body-name: body
@@ -311,19 +311,19 @@ paths:
         "200":
           description: FileDescriptorSet
           content:
-            application/x-protobuf;google.protobuf.FileDescriptorSet:
+            application/x-protobuf;proto=google.protobuf.FileDescriptorSet:
               schema:
                 type: object
-            text/x-protobuf;proto=google.protobuf.FileDescriptorSet:
+            text/x-protobuf;proto=google.protobuf.FileDescriptorSet;charset=utf-8:
               schema:
                 type: object
         "400":
           description: "INVALID_ARGUMENT: Invalid Metrics config."
           content:
-            application/x-protobuf;google.protobuf.FileDescriptorSet:
+            application/x-protobuf;proto=google.protobuf.FileDescriptorSet:
               schema:
                 $ref: "#/components/schemas/errors.JsonErrorResponse"
-            text/x-protobuf;proto=google.protobuf.FileDescriptorSet:
+            text/x-protobuf;proto=google.protobuf.FileDescriptorSet;charset=utf-8:
               schema:
                 $ref: "#/components/schemas/errors.JsonErrorResponse"
   /api/v2/validate_metrics_config:
@@ -342,10 +342,10 @@ paths:
       requestBody:
         description: Metrics config textproto
         content:
-          application/x-protobuf;proto=android.sdv.telemetry.MetricsConfig:
+          application/x-protobuf;proto=google.sdv.telemetry.MetricsConfig:
             schema:
               type: string
-          text/x-protobuf;proto=android.sdv.telemetry.MetricsConfig:
+          text/x-protobuf;proto=google.sdv.telemetry.MetricsConfig;charset=utf-8:
             schema:
               type: string
         required: false
