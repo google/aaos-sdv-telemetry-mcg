@@ -50,11 +50,11 @@ type MetricsConfigRequest struct {
 	ExistingUUID *mcuuid.MCUUID `json:"existing_uuid"`
 
 	// An array of base64 encoded binary `descriptorpb.FileDescriptorSet`s
-    // defining additional descriptors needed for the MetricsConfig. When
-    // inference is enabled, these schemas are parsed, structurally optimized,
-    // tree-shaken and then added to the MetricsConfig. If message inference is
-    // disabled, they are copied verbatim into the resulting MetricsConfig
-    // without filtering.
+	// defining additional descriptors needed for the MetricsConfig. When
+	// inference is enabled, these schemas are parsed, structurally optimized,
+	// tree-shaken and then added to the MetricsConfig. If message inference is
+	// disabled, they are copied verbatim into the resulting MetricsConfig
+	// without filtering.
 	DescriptorProtos [][]byte `json:"descriptor_protos"`
 
 	// A base64 encoded binary format of a `descriptorpb.FileDescriptorSet` containing VSIDL

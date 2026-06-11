@@ -328,4 +328,3 @@ func (ts *treeShaker) pruneUnusedAndWellKnownFileDescriptors() {
 		},
 	)
 }
-

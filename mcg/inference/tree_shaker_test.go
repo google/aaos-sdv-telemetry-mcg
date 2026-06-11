@@ -401,14 +401,14 @@ func TestTreeShake_PublicImports(t *testing.T) {
 		MessageType: []*descriptorpb.DescriptorProto{
 			{Name: proto.String("UnusedMessageB")},
 		},
-		Dependency: []string{"c.proto"},
+		Dependency:       []string{"c.proto"},
 		PublicDependency: []int32{0},
 	}
 	// file_a imports file_b, and uses MessageC (available via public import).
 	fdA := &descriptorpb.FileDescriptorProto{
-		Syntax:  proto.String("proto3"),
-		Name:    proto.String("a.proto"),
-		Package: proto.String("pkg.a"),
+		Syntax:     proto.String("proto3"),
+		Name:       proto.String("a.proto"),
+		Package:    proto.String("pkg.a"),
 		Dependency: []string{"b.proto"},
 		MessageType: []*descriptorpb.DescriptorProto{
 			{
@@ -452,10 +452,10 @@ func TestTreeShake_PublicImports(t *testing.T) {
 	// dependencies and public dependencies correctly preserved.
 	wantC := fdC
 	wantB := &descriptorpb.FileDescriptorProto{
-		Name:    proto.String("b.proto"),
-		Package: proto.String("pkg.b"),
-		Syntax:  proto.String("proto3"),
-		Dependency: []string{"c.proto"},
+		Name:             proto.String("b.proto"),
+		Package:          proto.String("pkg.b"),
+		Syntax:           proto.String("proto3"),
+		Dependency:       []string{"c.proto"},
 		PublicDependency: []int32{0},
 		// The unused message has been removed
 	}
@@ -500,10 +500,10 @@ func TestTreeShake_PublicDependencyIndexShift(t *testing.T) {
 	// It uses target.proto's message, so target.proto is retained.
 	// unused.proto is unused and should be pruned.
 	fdMain := &descriptorpb.FileDescriptorProto{
-		Syntax:  proto.String("proto3"),
-		Name:    proto.String("main.proto"),
-		Package: proto.String("pkg.main"),
-		Dependency: []string{"unused.proto", "public.proto", "target.proto"},
+		Syntax:           proto.String("proto3"),
+		Name:             proto.String("main.proto"),
+		Package:          proto.String("pkg.main"),
+		Dependency:       []string{"unused.proto", "public.proto", "target.proto"},
 		PublicDependency: []int32{1},
 		MessageType: []*descriptorpb.DescriptorProto{
 			{
@@ -557,7 +557,7 @@ func TestTreeShake_PublicDependencyIndexShift(t *testing.T) {
 		Package: proto.String("pkg.main"),
 		Syntax:  proto.String("proto3"),
 		// Dependencies and public dependencies have been updated.
-		Dependency: []string{"public.proto", "target.proto"},
+		Dependency:       []string{"public.proto", "target.proto"},
 		PublicDependency: []int32{0},
 		MessageType: []*descriptorpb.DescriptorProto{
 			{

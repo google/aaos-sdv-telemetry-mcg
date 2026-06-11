@@ -451,17 +451,17 @@ func TestNoDuplicateFileDescriptorsForTopLevelEnumAndMessage(t *testing.T) {
 
 func TestExternalDependencyIsRetained(t *testing.T) {
 	fd := &descriptorpb.FileDescriptorProto{
-		Name:       proto.String("main.proto"),
-		Package:    proto.String("my.main.package"),
-		Syntax:     proto.String("proto3"),
+		Name:    proto.String("main.proto"),
+		Package: proto.String("my.main.package"),
+		Syntax:  proto.String("proto3"),
 		MessageType: []*descriptorpb.DescriptorProto{
 			{
 				Name: proto.String("MyMessage"),
 				Field: []*descriptorpb.FieldDescriptorProto{
 					{
-						Name:     proto.String("msg_field"),
-						Number:   proto.Int32(1),
-						Type:     descriptorpb.FieldDescriptorProto_TYPE_BOOL.Enum(),
+						Name:   proto.String("msg_field"),
+						Number: proto.Int32(1),
+						Type:   descriptorpb.FieldDescriptorProto_TYPE_BOOL.Enum(),
 					},
 				},
 			},

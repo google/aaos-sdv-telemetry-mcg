@@ -161,4 +161,3 @@ func (g *Graph[Node]) StableReverseTopologicalOrdering() ([]Node, error) {
 	slices.Reverse(nodes)
 	return nodes, nil
 }
-
