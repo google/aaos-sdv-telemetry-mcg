@@ -15,7 +15,6 @@
 package type_resolvers_test
 
 import (
-	"fmt"
 	"slices"
 	"testing"
 
@@ -85,12 +84,7 @@ func TestSortFileDescriptorSetIgnoreDuplicates(t *testing.T) {
 		t.Error(err)
 	}
 
-	if len(sortedFdList) != len(expectedFdList) {
-		t.Errorf(fmt.Sprintf("Sorted []Filedescriptor has length of: %v, wanted %v", len(sortedFdList), len(expectedFdList)))
-	}
-	for i, sortedEntry := range sortedFdList {
-		if expectedFdList[i] == nil || expectedFdList[i].GetName() != sortedEntry.GetName() {
-			t.Errorf("Sorted []Filedescriptor %v does not match expected list %v", sortedFdList, expectedFdList)
-		}
+	if diff := cmp.Diff(expectedFdList, sortedFdList, protocmp.Transform()); diff != "" {
+		t.Errorf("SortFileDescriptorSet() returned unexpected difference (-want +got):\n%s", diff)
 	}
 }
