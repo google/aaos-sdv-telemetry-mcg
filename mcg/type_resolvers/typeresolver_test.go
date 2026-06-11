@@ -46,7 +46,7 @@ func NewTypeResolver(t *testing.T, fdSet *descriptorpb.FileDescriptorSet) *type_
 }
 
 func TestStoredLocalTypeCanBeFoundViaResolver(t *testing.T) {
-	speedFd := testhelper.GetSpeedFdWithDependencies()
+	speedFd := testhelper.GetSpeedFdWithDependencies(t)
 	resolver := NewTypeResolver(t, speedFd)
 
 	// Can be accessed through the EnrichedTypeResolver.
@@ -61,7 +61,7 @@ func TestStoredLocalTypeCanBeFoundViaResolver(t *testing.T) {
 }
 
 func TestStoredLocalTypeCanBeFoundViaResolversLocalTypes(t *testing.T) {
-	speedFd := testhelper.GetSpeedFdWithDependencies()
+	speedFd := testhelper.GetSpeedFdWithDependencies(t)
 	resolver := NewTypeResolver(t, speedFd)
 
 	// Will be saved as part of the local types (not global) of the EnrichedTypeResolver.
@@ -105,7 +105,7 @@ func TestNewTypeResolverFromFileDescriptorProtosContainsGivenMessages(t *testing
 }
 
 func TestExtendLocalTypesWithNewMessage(t *testing.T) {
-	speedFd := testhelper.GetSpeedFdWithDependencies()
+	speedFd := testhelper.GetSpeedFdWithDependencies(t)
 	resolver := NewTypeResolver(t, speedFd)
 
 	if err := resolver.ExtendLocalTypes(testdata.MaxavgcurFileDescriptorSet); err != nil {
@@ -120,7 +120,7 @@ func TestExtendLocalTypesWithNewMessage(t *testing.T) {
 func TestExtendLocalTypesWithDuplicateMessageDoesNotFail(t *testing.T) {
 	resolver := NewTypeResolver(t, &descriptorpb.FileDescriptorSet{})
 
-	fdSet := testhelper.GetSpeedFdWithDependencies()
+	fdSet := testhelper.GetSpeedFdWithDependencies(t)
 	// Call ExtendLocalTypes twice with the same fdSet to simulate a duplicate.
 	if err := resolver.ExtendLocalTypes(fdSet); err != nil {
 		t.Fatalf("First call to ExtendLocalTypes failed unexpectedly: %v", err)

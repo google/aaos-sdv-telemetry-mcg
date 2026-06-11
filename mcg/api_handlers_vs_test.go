@@ -36,7 +36,7 @@ func TestGenerateWithVersionNoCache(t *testing.T) {
 	ctx := context.Background()
 	router, _ := setupServer(ctx, t, false)
 
-	w := sendGenerateRequest(router, jsonInferVsFile)
+	w := sendGenerateRequest(t, router, jsonInferVsFile)
 
 	if want, got := http.StatusBadRequest, w.Result().StatusCode; want != got {
 		t.Errorf("w.Result().StatusCode = %d, want: %d", got, want)
@@ -51,7 +51,7 @@ func TestGenerateWithMissingVsVersion(t *testing.T) {
 	ctx := context.Background()
 	router, _ := setupServer(ctx, t, true)
 
-	w := sendGenerateRequest(router, jsonInferVsFile)
+	w := sendGenerateRequest(t, router, jsonInferVsFile)
 
 	if want, got := http.StatusBadRequest, w.Result().StatusCode; want != got {
 		t.Errorf("w.Result().StatusCode = %d, want: %d", got, want)
@@ -66,13 +66,13 @@ func TestGenerateWithVsVersion(t *testing.T) {
 	ctx := context.Background()
 	router, _ := setupServer(ctx, t, true)
 
-	w := sendVsAddRequest(router, validVsVersionFile)
+	w := sendVsAddRequest(t, router, validVsVersionFile)
 
 	if want, got := http.StatusOK, w.Result().StatusCode; want != got {
 		t.Errorf("w.Result().StatusCode = %d, want: %d", got, want)
 	}
 
-	w = sendGenerateRequest(router, jsonInferVsFile)
+	w = sendGenerateRequest(t, router, jsonInferVsFile)
 
 	if want, got := http.StatusOK, w.Result().StatusCode; want != got {
 		t.Errorf("w.Result().StatusCode = %d, want: %d", got, want)
@@ -83,22 +83,24 @@ func TestGenerateWithVsVersion(t *testing.T) {
 	}
 }
 
-func sendGenerateRequest(router *gin.Engine, file string) *httptest.ResponseRecorder {
+func sendGenerateRequest(tb testing.TB, router *gin.Engine, file string) *httptest.ResponseRecorder {
+	tb.Helper()
 	w := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodPost,
 		fmt.Sprintf("/api/%s/generate_metrics_config", constants.CurrentAPIVersion),
-		strings.NewReader(string(FileAsBytes(file))))
+		strings.NewReader(string(FileAsBytes(tb, file))))
 	req.Header.Set("Accept", "text/x-protobuf")
 	req.Header.Set("Content-Type", "application/json")
 	router.ServeHTTP(w, req)
 	return w
 }
 
-func sendVsAddRequest(router *gin.Engine, file string) *httptest.ResponseRecorder {
+func sendVsAddRequest(tb testing.TB, router *gin.Engine, file string) *httptest.ResponseRecorder {
+	tb.Helper()
 	w := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodPost,
 		fmt.Sprintf("/api/%s/vs/", constants.CurrentAPIVersion),
-		strings.NewReader(string(FileAsBytes(file))))
+		strings.NewReader(string(FileAsBytes(tb, file))))
 	req.Header.Set("Content-Type", "application/json")
 	router.ServeHTTP(w, req)
 	return w

@@ -52,8 +52,7 @@ func setupServer(ctx context.Context, t *testing.T, withLocCache bool) (*gin.Eng
 	}
 	router.Use(mcgerrors.MiddlewareRenderErrors)
 	if err := docs.InstallRoutes("/", router); err != nil {
-		// TODO
-		panic(err)
+		t.Fatalf("docs.InstallRoutes failed: %v", err)
 	}
 	server := &mcg.Server{}
 	server.InstallRoutes(router)
@@ -132,10 +131,11 @@ func helperGeneralGet(t *testing.T, path string, headers http.Header, router *gi
 	return w
 }
 
-func FileAsBytes(filename string) []byte {
+func FileAsBytes(tb testing.TB, filename string) []byte {
+	tb.Helper()
 	b, err := os.ReadFile(filename)
 	if err != nil {
-		panic(err)
+		tb.Fatalf("failed to read file %q: %v", filename, err)
 	}
 	return b
 }

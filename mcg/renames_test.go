@@ -34,7 +34,7 @@ func stripComments(nodes []*txtpbfmtast.Node) {
 }
 
 func TestApplyLegacyToCanonicalRenames(t *testing.T) {
-	inputBytes := FileAsBytes("testdata/v1_legacy_fixture.textproto")
+	inputBytes := FileAsBytes(t, "testdata/v1_legacy_fixture.textproto")
 
 	nodes, err := txtpbfmt.Parse(inputBytes)
 	if err != nil {
@@ -46,7 +46,7 @@ func TestApplyLegacyToCanonicalRenames(t *testing.T) {
 	stripComments(nodes)
 
 	got := string(txtpbfmt.PrettyBytes(nodes, 0))
-	wantBytes := FileAsBytes("testdata/v2_canonical_fixture.textproto")
+	wantBytes := FileAsBytes(t, "testdata/v2_canonical_fixture.textproto")
 	wantNodes, err := txtpbfmt.Parse(wantBytes)
 	if err != nil {
 		t.Fatalf("txtpbfmt.Parse(want) failed: %v", err)
@@ -59,7 +59,7 @@ func TestApplyLegacyToCanonicalRenames(t *testing.T) {
 }
 
 func TestApplyCanonicalToLegacyRenames(t *testing.T) {
-	inputBytes := FileAsBytes("testdata/v2_canonical_fixture.textproto")
+	inputBytes := FileAsBytes(t, "testdata/v2_canonical_fixture.textproto")
 
 	nodes, err := txtpbfmt.Parse(inputBytes)
 	if err != nil {
@@ -68,7 +68,7 @@ func TestApplyCanonicalToLegacyRenames(t *testing.T) {
 
 	mcg.ApplyCanonicalToLegacyRenames(nodes)
 
-	wantBytes := FileAsBytes("testdata/v1_legacy_fixture.textproto")
+	wantBytes := FileAsBytes(t, "testdata/v1_legacy_fixture.textproto")
 	wantNodes, err := txtpbfmt.Parse(wantBytes)
 	if err != nil {
 		t.Fatalf("txtpbfmt.Parse(want) failed: %v", err)
@@ -85,7 +85,7 @@ func TestApplyCanonicalToLegacyRenames(t *testing.T) {
 
 func TestRenamesRoundTrip(t *testing.T) {
 	// Start with Canonical
-	inputBytes := FileAsBytes("testdata/v2_canonical_fixture.textproto")
+	inputBytes := FileAsBytes(t, "testdata/v2_canonical_fixture.textproto")
 	nodes, err := txtpbfmt.Parse(inputBytes)
 	if err != nil {
 		t.Fatalf("txtpbfmt.Parse failed: %v", err)

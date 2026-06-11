@@ -629,7 +629,7 @@ const (
 )
 
 func TestMilestoneEIPF_B(t *testing.T) {
-	fixtureTestCurrent(t, string(FileAsBytes(EIPF_B_JSON_FILENAME)), string(FileAsBytes(EIPF_B_TEXTPROTO_FILENAME)))
+	fixtureTestCurrent(t, string(FileAsBytes(t, EIPF_B_JSON_FILENAME)), string(FileAsBytes(t, EIPF_B_TEXTPROTO_FILENAME)))
 }
 
 func TestTextFormat(t *testing.T) {
@@ -638,7 +638,7 @@ func TestTextFormat(t *testing.T) {
 
 	w := performPostRequest(router,
 		fmt.Sprintf("/api/%s/generate_metrics_config", constants.CurrentAPIVersion),
-		"application/json", "text/x-protobuf", FileAsBytes(EIPF_B_JSON_FILENAME))
+		"application/json", "text/x-protobuf", FileAsBytes(t, EIPF_B_JSON_FILENAME))
 
 	if w.Result().StatusCode != http.StatusOK {
 		t.Errorf("Failure response: %d\n%v", w.Result().StatusCode, w.Body.String())
@@ -656,7 +656,7 @@ func TestTextFormat(t *testing.T) {
 }
 
 func TestValidateWithTextprotoPasses(t *testing.T) {
-	textProtoAsBytes := []byte(FileAsBytes(EIPF_B_TEXTPROTO_FILENAME))
+	textProtoAsBytes := []byte(FileAsBytes(t, EIPF_B_TEXTPROTO_FILENAME))
 	var mc pb.MetricsConfig
 	if err := prototext.Unmarshal(textProtoAsBytes, &mc); err != nil {
 		t.Fatal(err)
@@ -709,7 +709,7 @@ func TestValidateWithTextprotoFails(t *testing.T) {
 	ctx := context.Background()
 	router, _ := setupServer(ctx, t, false)
 
-	textProtoAsBytes := []byte(FileAsBytes(EIPF_B_TEXTPROTO_FILENAME))
+	textProtoAsBytes := []byte(FileAsBytes(t, EIPF_B_TEXTPROTO_FILENAME))
 	w := performPostRequest(router,
 		fmt.Sprintf("/api/%s/validate_metrics_config", constants.CurrentAPIVersion),
 		mcg.CONTENT_TYPE_TEXT_X_PROTOBUF, "", textProtoAsBytes)
@@ -762,7 +762,7 @@ func TestGenerateAndValidateWithProtobufBytesPasses(t *testing.T) {
 
 	w1 := performPostRequest(router,
 		fmt.Sprintf("/api/%s/generate_metrics_config", constants.CurrentAPIVersion),
-		"application/json", "application/x-protobuf", FileAsBytes(EIPF_B_JSON_FILENAME))
+		"application/json", "application/x-protobuf", FileAsBytes(t, EIPF_B_JSON_FILENAME))
 
 	if w1.Result().StatusCode != http.StatusOK {
 		t.Fatalf("Failure response: %d\n%v", w1.Result().StatusCode, w1.Body.String())
@@ -886,42 +886,42 @@ func TestGenerateWithExistingInvalidUuidFails(t *testing.T) {
 }
 
 func TestGenerateWithInference(t *testing.T) {
-	fixtureTestCurrent(t, string(FileAsBytes(INFER_JSON_FILENAME)), string(FileAsBytes(INFER_TEXTPROTO_FILENAME)))
+	fixtureTestCurrent(t, string(FileAsBytes(t, INFER_JSON_FILENAME)), string(FileAsBytes(t, INFER_TEXTPROTO_FILENAME)))
 }
 
 func TestGenerateWithInferenceCustomAggregationMessageType(t *testing.T) {
-	fixtureTestCurrent(t, string(FileAsBytes(CUSTOM_AGGREGATION_MESSAGE_TYPE_JSON_FILENAME)), string(FileAsBytes(CUSTOM_AGGREGATION_MESSAGE_TYPE_TEXTPROTO_FILENAME)))
+	fixtureTestCurrent(t, string(FileAsBytes(t, CUSTOM_AGGREGATION_MESSAGE_TYPE_JSON_FILENAME)), string(FileAsBytes(t, CUSTOM_AGGREGATION_MESSAGE_TYPE_TEXTPROTO_FILENAME)))
 }
 
 // Test for b/378900418.
 func TestSourcesAreInferredTopologically(t *testing.T) {
-	fixtureTestCurrent(t, string(FileAsBytes(TOPOLOGICAL_SOURCE_INFERENCE_JSON_FILENAME)), string(FileAsBytes(TOPOLOGICAL_SOURCE_INFERENCE_TEXTPROTO_FILENAME)))
+	fixtureTestCurrent(t, string(FileAsBytes(t, TOPOLOGICAL_SOURCE_INFERENCE_JSON_FILENAME)), string(FileAsBytes(t, TOPOLOGICAL_SOURCE_INFERENCE_TEXTPROTO_FILENAME)))
 }
 
 // Test for b/380905512.
 func TestAdhocDescriptorsUseProto2(t *testing.T) {
-	fixtureTestCurrent(t, string(FileAsBytes(ADHOC_DESCRIPTORS_PROTO2_JSON_FILENAME)), string(FileAsBytes(ADHOC_DESCRIPTORS_PROTO2_TEXTPROTO_FILENAME)))
+	fixtureTestCurrent(t, string(FileAsBytes(t, ADHOC_DESCRIPTORS_PROTO2_JSON_FILENAME)), string(FileAsBytes(t, ADHOC_DESCRIPTORS_PROTO2_TEXTPROTO_FILENAME)))
 }
 
 func TestDataSourceMessageTypes(t *testing.T) {
-	fixtureTestCurrent(t, string(FileAsBytes(DATA_SOURCE_MESSAGE_TYPES_JSON_FILENAME)), string(FileAsBytes(DATA_SOURCE_MESSAGE_TYPES_TEXTPROTO_FILENAME)))
+	fixtureTestCurrent(t, string(FileAsBytes(t, DATA_SOURCE_MESSAGE_TYPES_JSON_FILENAME)), string(FileAsBytes(t, DATA_SOURCE_MESSAGE_TYPES_TEXTPROTO_FILENAME)))
 }
 
 // Test for source configuration and b/384562190.
 func TestDataSourceConfigurationWorks(t *testing.T) {
-	fixtureTestCurrent(t, string(FileAsBytes(SOURCE_CONFIGURATION_JSON_FILENAME)), string(FileAsBytes(SOURCE_CONFIGURATION_TEXTPROTO_FILENAME)))
+	fixtureTestCurrent(t, string(FileAsBytes(t, SOURCE_CONFIGURATION_JSON_FILENAME)), string(FileAsBytes(t, SOURCE_CONFIGURATION_TEXTPROTO_FILENAME)))
 }
 
 func TestConditionalTriggerConfigurationWorks(t *testing.T) {
-	fixtureTestCurrent(t, string(FileAsBytes(CONDITIONAL_TRIGGER_JSON_FILENAME)), string(FileAsBytes(CONDITIONAL_TRIGGER_TEXTPROTO_FILENAME)))
+	fixtureTestCurrent(t, string(FileAsBytes(t, CONDITIONAL_TRIGGER_JSON_FILENAME)), string(FileAsBytes(t, CONDITIONAL_TRIGGER_TEXTPROTO_FILENAME)))
 }
 
 func TestInitNodeIndex(t *testing.T) {
-	fixtureTestCurrent(t, string(FileAsBytes(INIT_NODE_INDEX_JSON_FILENAME)), string(FileAsBytes(INIT_NODE_INDEX_TEXTPROTO_FILENAME)))
+	fixtureTestCurrent(t, string(FileAsBytes(t, INIT_NODE_INDEX_JSON_FILENAME)), string(FileAsBytes(t, INIT_NODE_INDEX_TEXTPROTO_FILENAME)))
 }
 
 func TestComprehensiveDescriptorOptimization(t *testing.T) {
-	fixtureTestCurrent(t, string(FileAsBytes(COMPREHENSIVE_DESCRIPTOR_OPTIMIZATION_JSON_FILENAME)), string(FileAsBytes(COMPREHENSIVE_DESCRIPTOR_OPTIMIZATION_TEXTPROTO_FILENAME)))
+	fixtureTestCurrent(t, string(FileAsBytes(t, COMPREHENSIVE_DESCRIPTOR_OPTIMIZATION_JSON_FILENAME)), string(FileAsBytes(t, COMPREHENSIVE_DESCRIPTOR_OPTIMIZATION_TEXTPROTO_FILENAME)))
 }
 
 func TestRetainAggregationsOnStop(t *testing.T) {
@@ -983,7 +983,7 @@ func TestAPIVersionCompatibility(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			fixtureTest(t, tc.apiVersion, string(FileAsBytes(tc.jsonFile)), string(FileAsBytes(API_COMPATIBILITY_OUTPUT_TEXTPROTO_FILENAME)))
+			fixtureTest(t, tc.apiVersion, string(FileAsBytes(t, tc.jsonFile)), string(FileAsBytes(t, API_COMPATIBILITY_OUTPUT_TEXTPROTO_FILENAME)))
 		})
 	}
 }
@@ -1042,7 +1042,7 @@ func TestGetFileDescriptor(t *testing.T) {
 	fds_want := &descriptorpb.FileDescriptorSet{}
 	prototext.Unmarshal(fds_want_bytes, fds_want)
 
-	textProtoAsBytes := []byte(FileAsBytes(EIPF_B_TEXTPROTO_FILENAME))
+	textProtoAsBytes := []byte(FileAsBytes(t, EIPF_B_TEXTPROTO_FILENAME))
 
 	w := performPostRequest(router,
 		fmt.Sprintf("/api/%s/get_file_descriptor_set", constants.CurrentAPIVersion),
@@ -1122,7 +1122,7 @@ func TestInferenceFailsForVectorOfVector(t *testing.T) {
 
 func loadEipfBAsLegacyTextproto(t *testing.T) []byte {
 	t.Helper()
-	textproto := FileAsBytes(EIPF_B_TEXTPROTO_FILENAME)
+	textproto := FileAsBytes(t, EIPF_B_TEXTPROTO_FILENAME)
 	var mc pb.MetricsConfig
 	if err := prototext.Unmarshal(textproto, &mc); err != nil {
 		t.Fatalf("prototext.Unmarshal failed: %v", err)
@@ -1151,7 +1151,7 @@ func TestV1EndpointsAcceptLegacyFormat(t *testing.T) {
 	})
 
 	t.Run("generate_v1_json", func(t *testing.T) {
-		deprecatedPayload := FileAsBytes(API_COMPATIBILITY_LEGACY_JSON_FILENAME)
+		deprecatedPayload := FileAsBytes(t, API_COMPATIBILITY_LEGACY_JSON_FILENAME)
 		w := performPostRequest(router, "/api/v1/generate_metrics_config", "application/json", "text/x-protobuf", deprecatedPayload)
 
 		if w.Code != http.StatusOK {
@@ -1190,8 +1190,8 @@ func TestAPIVersionSchemaEnforcement(t *testing.T) {
 	ctx := context.Background()
 	router, _ := setupServer(ctx, t, false)
 
-	deprecatedPayload := string(FileAsBytes(API_COMPATIBILITY_LEGACY_JSON_FILENAME))
-	canonicalPayload := string(FileAsBytes(API_COMPATIBILITY_CANONICAL_JSON_FILENAME))
+	deprecatedPayload := string(FileAsBytes(t, API_COMPATIBILITY_LEGACY_JSON_FILENAME))
+	canonicalPayload := string(FileAsBytes(t, API_COMPATIBILITY_CANONICAL_JSON_FILENAME))
 
 	testCases := []struct {
 		name       string

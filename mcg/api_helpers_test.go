@@ -157,7 +157,7 @@ sources {
 }
 
 func TestTextprotoMarshalLegacy(t *testing.T) {
-	input := FileAsBytes("testdata/v2_canonical_fixture.textproto")
+	input := FileAsBytes(t, "testdata/v2_canonical_fixture.textproto")
 	var mc pb.MetricsConfig
 	if err := prototext.Unmarshal(input, &mc); err != nil {
 		t.Fatalf("prototext.Unmarshal(input) = %v, want nil", err)
@@ -168,7 +168,7 @@ func TestTextprotoMarshalLegacy(t *testing.T) {
 		t.Fatalf("mcg.TextprotoMarshal(mc, true) = %v, want nil", err)
 	}
 
-	want := FileAsBytes("testdata/v1_legacy_fixture.textproto")
+	want := FileAsBytes(t, "testdata/v1_legacy_fixture.textproto")
 
 	if diff := cmp.Diff(string(want), string(got)); diff != "" {
 		t.Errorf("mcg.TextprotoMarshal(mc, true) mismatch (-want +got):\n%s", diff)
@@ -176,14 +176,14 @@ func TestTextprotoMarshalLegacy(t *testing.T) {
 }
 
 func TestTextprotoUnmarshalLegacy(t *testing.T) {
-	input := FileAsBytes("testdata/v1_legacy_fixture.textproto")
+	input := FileAsBytes(t, "testdata/v1_legacy_fixture.textproto")
 
 	mc, err := mcg.ParseMetricsConfig(input, mcg.CONTENT_TYPE_TEXT_X_PROTOBUF, constants.APIVersionV1)
 	if err != nil {
 		t.Fatalf("ParseMetricsConfig(input, V1) failed: %v", err)
 	}
 
-	wantInput := FileAsBytes("testdata/v2_canonical_fixture.textproto")
+	wantInput := FileAsBytes(t, "testdata/v2_canonical_fixture.textproto")
 	var want pb.MetricsConfig
 	if err := prototext.Unmarshal(wantInput, &want); err != nil {
 		t.Fatalf("prototext.Unmarshal(wantInput) failed: %v", err)
@@ -236,9 +236,9 @@ func TestContentTypeConstants(t *testing.T) {
 }
 
 func TestParseMetricsConfigValidation(t *testing.T) {
-	legacyInput := FileAsBytes("testdata/v1_legacy_fixture.textproto")
-	canonicalInput := FileAsBytes("testdata/v2_canonical_fixture.textproto")
-	mixedInput := FileAsBytes("testdata/mixed_v1_v2_fixture.textproto")
+	legacyInput := FileAsBytes(t, "testdata/v1_legacy_fixture.textproto")
+	canonicalInput := FileAsBytes(t, "testdata/v2_canonical_fixture.textproto")
+	mixedInput := FileAsBytes(t, "testdata/mixed_v1_v2_fixture.textproto")
 
 	tests := []struct {
 		name       string

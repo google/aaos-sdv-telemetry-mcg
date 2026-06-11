@@ -16,7 +16,6 @@ package testhelper
 
 import (
 	"encoding/json"
-	"fmt"
 	"os"
 	"slices"
 	"testing"
@@ -50,7 +49,8 @@ func MergeFileDescriptorSets(fdSets ...*descriptorpb.FileDescriptorSet) *descrip
 	return result
 }
 
-func MustGetFileDescriptorFromSet(fdSet *descriptorpb.FileDescriptorSet, name string) *descriptorpb.FileDescriptorProto {
+func MustGetFileDescriptorFromSet(tb testing.TB, fdSet *descriptorpb.FileDescriptorSet, name string) *descriptorpb.FileDescriptorProto {
+	tb.Helper()
 	idx := slices.IndexFunc(fdSet.File, func(fd *descriptorpb.FileDescriptorProto) bool {
 		return *fd.Name == name
 	})
@@ -59,20 +59,21 @@ func MustGetFileDescriptorFromSet(fdSet *descriptorpb.FileDescriptorSet, name st
 		for i, fd := range fdSet.File {
 			fileNames[i] = *fd.Name
 		}
-		panic(fmt.Sprintf("Failed to find file descriptor named %q in file descriptor containing files named: %v", name, fileNames))
+		tb.Fatalf("Failed to find file descriptor named %q in file descriptor containing files named: %v", name, fileNames)
 	}
 
 	return fdSet.File[idx]
 }
 
-func GetSpeedFdWithDependencies() *descriptorpb.FileDescriptorSet {
+func GetSpeedFdWithDependencies(tb testing.TB) *descriptorpb.FileDescriptorSet {
+	tb.Helper()
 	fdSet := new(descriptorpb.FileDescriptorSet)
 	fdSet.File = []*descriptorpb.FileDescriptorProto{
-		MustGetFileDescriptorFromSet(testdata.SpeedFileDescriptorSet, "mcg/testdata/speed/vehicle_speed.proto"),
-		MustGetFileDescriptorFromSet(testdata.VehicleSignalsSampleFileDescriptorSet, "mcg/testdata/vehicle_signals_sample/sdv_protos/syntax/vsidl.proto"),
-		MustGetFileDescriptorFromSet(testdata.VehicleSignalsSampleFileDescriptorSet, "mcg/testdata/vehicle_signals_sample/sdv_protos/syntax/someip.proto"),
-		MustGetFileDescriptorFromSet(testdata.VehicleSignalsSampleFileDescriptorSet, "mcg/testdata/vehicle_signals_sample/sdv_protos/syntax/someip_type.proto"),
-		MustGetFileDescriptorFromSet(testdata.VehicleSignalsSampleFileDescriptorSet, "mcg/testdata/vehicle_signals_sample/sdv_protos/syntax/diagnostics.proto"),
+		MustGetFileDescriptorFromSet(tb, testdata.SpeedFileDescriptorSet, "mcg/testdata/speed/vehicle_speed.proto"),
+		MustGetFileDescriptorFromSet(tb, testdata.VehicleSignalsSampleFileDescriptorSet, "mcg/testdata/vehicle_signals_sample/sdv_protos/syntax/vsidl.proto"),
+		MustGetFileDescriptorFromSet(tb, testdata.VehicleSignalsSampleFileDescriptorSet, "mcg/testdata/vehicle_signals_sample/sdv_protos/syntax/someip.proto"),
+		MustGetFileDescriptorFromSet(tb, testdata.VehicleSignalsSampleFileDescriptorSet, "mcg/testdata/vehicle_signals_sample/sdv_protos/syntax/someip_type.proto"),
+		MustGetFileDescriptorFromSet(tb, testdata.VehicleSignalsSampleFileDescriptorSet, "mcg/testdata/vehicle_signals_sample/sdv_protos/syntax/diagnostics.proto"),
 	}
 	return fdSet
 }

@@ -63,7 +63,7 @@ func TestParseDataSourceConfigurationFromDescriptorProtos(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			fd := testhelper.GetSpeedFdWithDependencies()
+			fd := testhelper.GetSpeedFdWithDependencies(t)
 			fdBytes, err := proto.Marshal(fd)
 			if err != nil {
 				t.Fatalf("failed to marshal file descriptor set: %v", err)

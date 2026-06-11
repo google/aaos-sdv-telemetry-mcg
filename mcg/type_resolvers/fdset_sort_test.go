@@ -65,8 +65,8 @@ func TestSortFileDescriptorSet(t *testing.T) {
 }
 
 func TestSortFileDescriptorSetIgnoreDuplicates(t *testing.T) {
-	speed_list_proto := testhelper.MustGetFileDescriptorFromSet(testdata.VehicleSignalsSampleFileDescriptorSet, "mcg/testdata/vehicle_signals_sample/subpkg/sample_speed_list.proto")
-	speed_proto := testhelper.MustGetFileDescriptorFromSet(testdata.VehicleSignalsSampleFileDescriptorSet, "mcg/testdata/vehicle_signals_sample/subpkg/sample_speed.proto")
+	speed_list_proto := testhelper.MustGetFileDescriptorFromSet(t, testdata.VehicleSignalsSampleFileDescriptorSet, "mcg/testdata/vehicle_signals_sample/subpkg/sample_speed_list.proto")
+	speed_proto := testhelper.MustGetFileDescriptorFromSet(t, testdata.VehicleSignalsSampleFileDescriptorSet, "mcg/testdata/vehicle_signals_sample/subpkg/sample_speed.proto")
 
 	fdSetUnsorted := new(descriptorpb.FileDescriptorSet)
 	fdSetUnsorted.File = []*descriptorpb.FileDescriptorProto{

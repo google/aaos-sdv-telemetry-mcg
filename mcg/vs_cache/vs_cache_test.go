@@ -237,7 +237,7 @@ func TestGetDoesNotModifyCache(t *testing.T) {
 
 	// Modify the returned resolver by extending it with new types.
 	// This should not affect the cached version.
-	newTypes := testhelper.GetSpeedFdWithDependencies()
+	newTypes := testhelper.GetSpeedFdWithDependencies(t)
 	if err := resolver1.ExtendLocalTypes(newTypes); err != nil {
 		t.Fatalf("resolver1.ExtendLocalTypes() failed: %v", err)
 	}
