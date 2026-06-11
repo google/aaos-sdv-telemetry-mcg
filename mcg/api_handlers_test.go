@@ -602,10 +602,10 @@ func TestExpressionNodes(t *testing.T) {
 }
 
 const (
-	BUG_378900418_JSON_FILENAME                              = "testdata/378900418.json"
-	BUG_378900418_TEXTPROTO_FILENAME                         = "testdata/378900418.textproto"
-	BUG_380905512_JSON_FILENAME                              = "testdata/380905512.json"
-	BUG_380905512_TEXTPROTO_FILENAME                         = "testdata/380905512.textproto"
+	TOPOLOGICAL_SOURCE_INFERENCE_JSON_FILENAME               = "testdata/topological_source_inference.json"
+	TOPOLOGICAL_SOURCE_INFERENCE_TEXTPROTO_FILENAME          = "testdata/topological_source_inference.textproto"
+	ADHOC_DESCRIPTORS_PROTO2_JSON_FILENAME                   = "testdata/adhoc_descriptors_proto2.json"
+	ADHOC_DESCRIPTORS_PROTO2_TEXTPROTO_FILENAME              = "testdata/adhoc_descriptors_proto2.textproto"
 	COMPREHENSIVE_DESCRIPTOR_OPTIMIZATION_JSON_FILENAME      = "testdata/comprehensive_descriptor_optimization.json"
 	COMPREHENSIVE_DESCRIPTOR_OPTIMIZATION_TEXTPROTO_FILENAME = "testdata/comprehensive_descriptor_optimization.textproto"
 	CONDITIONAL_TRIGGER_JSON_FILENAME                        = "testdata/conditional_trigger.json"
@@ -895,12 +895,12 @@ func TestGenerateWithInferenceCustomAggregationMessageType(t *testing.T) {
 
 // Test for b/378900418.
 func TestSourcesAreInferredTopologically(t *testing.T) {
-	fixtureTestCurrent(t, string(FileAsBytes(BUG_378900418_JSON_FILENAME)), string(FileAsBytes(BUG_378900418_TEXTPROTO_FILENAME)))
+	fixtureTestCurrent(t, string(FileAsBytes(TOPOLOGICAL_SOURCE_INFERENCE_JSON_FILENAME)), string(FileAsBytes(TOPOLOGICAL_SOURCE_INFERENCE_TEXTPROTO_FILENAME)))
 }
 
 // Test for b/380905512.
 func TestAdhocDescriptorsUseProto2(t *testing.T) {
-	fixtureTestCurrent(t, string(FileAsBytes(BUG_380905512_JSON_FILENAME)), string(FileAsBytes(BUG_380905512_TEXTPROTO_FILENAME)))
+	fixtureTestCurrent(t, string(FileAsBytes(ADHOC_DESCRIPTORS_PROTO2_JSON_FILENAME)), string(FileAsBytes(ADHOC_DESCRIPTORS_PROTO2_TEXTPROTO_FILENAME)))
 }
 
 func TestDataSourceMessageTypes(t *testing.T) {

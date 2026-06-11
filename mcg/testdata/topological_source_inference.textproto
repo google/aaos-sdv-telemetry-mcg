@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# Tests topological source inference behavior (b/378900418).
 version: 3758096386
 descriptor_protos {
   name: "adhoc.proto"

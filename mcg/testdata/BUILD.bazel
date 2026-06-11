@@ -28,10 +28,8 @@ exports_files([
 filegroup(
     name = "exported_testdata",
     srcs = [
-        "378900418.json",
-        "378900418.textproto",
-        "380905512.json",
-        "380905512.textproto",
+        "adhoc_descriptors_proto2.json",
+        "adhoc_descriptors_proto2.textproto",
         "api_version_compatibility/canonical_version.json",
         "api_version_compatibility/deprecated_version.json",
         "api_version_compatibility/output.textproto",
@@ -57,6 +55,8 @@ filegroup(
         "redis/run_cluster.sh",
         "source_configuration.json",
         "source_configuration.textproto",
+        "topological_source_inference.json",
+        "topological_source_inference.textproto",
         "v1_legacy_fixture.textproto",
         "v2_canonical_fixture.textproto",
         "vsignal_api/sample_ssot_ver1.json",
