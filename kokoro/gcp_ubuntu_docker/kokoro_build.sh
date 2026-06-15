@@ -14,6 +14,7 @@
 # limitations under the License.
 
 set -euo pipefail
+shopt -s globstar
 
 MCG_REPO="${KOKORO_ARTIFACTS_DIR}/git/mcg"
 cd "${MCG_REPO}"
