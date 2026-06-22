@@ -20,6 +20,7 @@ package expressions
 
 import (
 	"fmt"
+	"log"
 	"regexp"
 	"slices"
 	"sort"
@@ -39,14 +40,23 @@ type Text struct {
 	Uncompiled string
 }
 
-type ParserShunt struct {
-	nodes      []*pb.Node
-	nodeByText map[string]uint32
+type operand struct {
+	index         uint32
+	isComparison  bool
+	parenthesized bool
 }
 
-func NewParserShunt() *ParserShunt {
+type ParserShunt struct {
+	nodes                              []*pb.Node
+	nodeByText                         map[string]uint32
+	disallowComparisonOperatorChaining bool
+}
+
+// NewParserShunt returns a new ParserShunt initialized with the given comparison chaining configuration.
+func NewParserShunt(disallowComparisonOperatorChaining bool) *ParserShunt {
 	return &ParserShunt{
-		nodeByText: make(map[string]uint32),
+		nodeByText:                         make(map[string]uint32),
+		disallowComparisonOperatorChaining: disallowComparisonOperatorChaining,
 	}
 }
 
@@ -102,7 +112,7 @@ func (p *ParserShunt) compileOne(source string) (uint32, error) {
 		return 0, mcgerrors.InvalidExpressionError(source, err)
 	}
 
-	operandStack := make([]uint32, 0, 8)
+	operandStack := make([]operand, 0, 8)
 	operatorStack := make([]Operator, 0, 8)
 	for _, tok := range tokens {
 		switch ttok := tok.(type) {
@@ -113,7 +123,7 @@ func (p *ParserShunt) compileOne(source string) (uint32, error) {
 					FieldLeafNode: pb.FieldLeafNode_builder{
 						SourceName: pub,
 					}.Build(),
-				}.Build(), &operandStack)
+				}.Build(), &operandStack, false)
 			} else {
 				pub := ttok[0]
 				fields := ttok[1:]
@@ -122,40 +132,40 @@ func (p *ParserShunt) compileOne(source string) (uint32, error) {
 						SourceName: pub,
 						FieldNames: fields,
 					}.Build(),
-				}.Build(), &operandStack)
+				}.Build(), &operandStack, false)
 			}
 		case bool:
 			p.pushNodeToOperandStack(pb.Node_builder{
 				ConstantLeafNode: pb.ConstantLeafNode_builder{
 					BoolValue: &ttok,
 				}.Build(),
-			}.Build(), &operandStack)
+			}.Build(), &operandStack, false)
 		case int32:
 			p.pushNodeToOperandStack(pb.Node_builder{
 				ConstantLeafNode: pb.ConstantLeafNode_builder{
 					Int32Value: &ttok,
 				}.Build(),
-			}.Build(), &operandStack)
+			}.Build(), &operandStack, false)
 		case int64:
 			p.pushNodeToOperandStack(pb.Node_builder{
 				ConstantLeafNode: pb.ConstantLeafNode_builder{
 					Int64Value: &ttok,
 				}.Build(),
-			}.Build(), &operandStack)
+			}.Build(), &operandStack, false)
 		case float32:
 			p.pushNodeToOperandStack(pb.Node_builder{
 				ConstantLeafNode: pb.ConstantLeafNode_builder{
 					FloatValue: &ttok,
 				}.Build(),
-			}.Build(), &operandStack)
+			}.Build(), &operandStack, false)
 		case float64:
 			p.pushNodeToOperandStack(pb.Node_builder{
 				ConstantLeafNode: pb.ConstantLeafNode_builder{
 					DoubleValue: &ttok,
 				}.Build(),
-			}.Build(), &operandStack)
+			}.Build(), &operandStack, false)
 		case *pb.Node:
-			p.pushNodeToOperandStack(ttok, &operandStack)
+			p.pushNodeToOperandStack(ttok, &operandStack, false)
 		case Operator:
 			switch ttok {
 			case OperatorAllEq, OperatorContains, OperatorDoesNotContain, OperatorFloor, OperatorRound, OperatorCeil, OperatorAbsolute, OperatorUnaryMinus, OperatorLength:
@@ -178,7 +188,7 @@ func (p *ParserShunt) compileOne(source string) (uint32, error) {
 					if err != nil {
 						return 0, mcgerrors.InvalidExpressionError(source, err)
 					}
-					p.pushNodeToOperandStack(n, &operandStack)
+					p.pushNodeToOperandStack(n, &operandStack, isComparisonOperator(lastOp))
 				}
 				operatorStack = append(operatorStack, OperatorSubscript)
 				operatorStack = append(operatorStack, OperatorLeftSquareBracket)
@@ -197,7 +207,7 @@ func (p *ParserShunt) compileOne(source string) (uint32, error) {
 					if err != nil {
 						return 0, mcgerrors.InvalidExpressionError(source, err)
 					}
-					p.pushNodeToOperandStack(n, &operandStack)
+					p.pushNodeToOperandStack(n, &operandStack, isComparisonOperator(lastOp))
 				}
 				operatorStack = append(operatorStack, ttok)
 			}
@@ -218,17 +228,17 @@ func (p *ParserShunt) compileOne(source string) (uint32, error) {
 		if err != nil {
 			return 0, mcgerrors.InvalidExpressionError(source, err)
 		}
-		p.pushNodeToOperandStack(n, &operandStack)
+		p.pushNodeToOperandStack(n, &operandStack, isComparisonOperator(lastOp))
 	}
 	if len(operandStack) > 1 {
 		return 0, mcgerrors.InvalidExpressionError(source, fmt.Errorf("Found operand(s) but no operator"))
 	} else if len(operandStack) < 1 {
 		return 0, mcgerrors.InvalidExpressionError(source, fmt.Errorf("Found no valid operands"))
 	}
-	return operandStack[0], nil
+	return operandStack[0].index, nil
 }
 
-// Returns true if of uses parentheses like a function call
+// isFunctionLike returns true if op uses parentheses like a function call.
 func isFunctionLike(op Operator) bool {
 	switch op {
 	case OperatorAllEq, OperatorContains, OperatorDoesNotContain, OperatorFloor, OperatorRound, OperatorCeil, OperatorAbsolute, OperatorUnaryMinus, OperatorLength:
@@ -238,9 +248,29 @@ func isFunctionLike(op Operator) bool {
 	}
 }
 
+// isUnaryOperator returns true if op is a unary operator.
+func isUnaryOperator(op Operator) bool {
+	switch op {
+	case OperatorFloor, OperatorRound, OperatorCeil, OperatorNot, OperatorAbsolute, OperatorUnaryMinus, OperatorLength:
+		return true
+	default:
+		return false
+	}
+}
+
+// isComparisonOperator returns true if op is a binary comparison operator.
+func isComparisonOperator(op Operator) bool {
+	switch op {
+	case OperatorEq, OperatorNotEq, OperatorLt, OperatorLtEq, OperatorGt, OperatorGtEq:
+		return true
+	default:
+		return false
+	}
+}
+
 // Processes the stack when token ')' is encountered. Builds nodes until a
 // matching '(' is found. Returns errors for any mismatched or redundant parenthesis.
-func (p *ParserShunt) handleRightParen(operandStack *[]uint32, operatorStack *[]Operator) error {
+func (p *ParserShunt) handleRightParen(operandStack *[]operand, operatorStack *[]Operator) error {
 	foundOperator := false
 	for len(*operatorStack) > 0 {
 		op := (*operatorStack)[len(*operatorStack)-1]
@@ -252,6 +282,9 @@ func (p *ParserShunt) handleRightParen(operandStack *[]uint32, operatorStack *[]
 					return fmt.Errorf("Found redundant parenthesis")
 				}
 			}
+			if len(*operandStack) > 0 {
+				(*operandStack)[len(*operandStack)-1].parenthesized = true
+			}
 			return nil
 		}
 
@@ -260,13 +293,13 @@ func (p *ParserShunt) handleRightParen(operandStack *[]uint32, operatorStack *[]
 		if err != nil {
 			return err
 		}
-		p.pushNodeToOperandStack(n, operandStack)
+		p.pushNodeToOperandStack(n, operandStack, isComparisonOperator(op))
 	}
 
 	return fmt.Errorf("Found closing parenthesis without matching opening parenthesis")
 }
 
-func (p *ParserShunt) handleRightSquareBracket(operandStack *[]uint32, operatorStack *[]Operator) error {
+func (p *ParserShunt) handleRightSquareBracket(operandStack *[]operand, operatorStack *[]Operator) error {
 	for len(*operatorStack) > 0 {
 		op := (*operatorStack)[len(*operatorStack)-1]
 		*operatorStack = (*operatorStack)[:len(*operatorStack)-1]
@@ -282,7 +315,7 @@ func (p *ParserShunt) handleRightSquareBracket(operandStack *[]uint32, operatorS
 		if err != nil {
 			return err
 		}
-		p.pushNodeToOperandStack(n, operandStack)
+		p.pushNodeToOperandStack(n, operandStack, isComparisonOperator(op))
 	}
 
 	return fmt.Errorf("Found closing square bracket without matching opening square bracket")
@@ -293,12 +326,11 @@ func (p *ParserShunt) getOperatorToProto(op Operator) *pb.CombinationNode {
 }
 
 // Pop the correct number of operands off the stack and create a Node.
-func (p *ParserShunt) buildCombinationNode(op Operator, operandStack *[]uint32) (*pb.Node, error) {
-	var left, right uint32
+func (p *ParserShunt) buildCombinationNode(op Operator, operandStack *[]operand) (*pb.Node, error) {
+	var left, right operand
 	var rightIndex *uint32
-	isUnaryOperator := op == OperatorFloor || op == OperatorRound || op == OperatorCeil || op == OperatorNot || op == OperatorAbsolute || op == OperatorUnaryMinus || op == OperatorLength
 
-	if isUnaryOperator {
+	if isUnaryOperator(op) {
 		if len(*operandStack) < 1 {
 			return nil, fmt.Errorf("Missing operand for unary operator: %v", op)
 		}
@@ -311,12 +343,19 @@ func (p *ParserShunt) buildCombinationNode(op Operator, operandStack *[]uint32) 
 		right = (*operandStack)[len(*operandStack)-1]
 		left = (*operandStack)[len(*operandStack)-2]
 		*operandStack = (*operandStack)[:len(*operandStack)-2]
-		rightIndex = proto.Uint32(right)
+		rightIndex = proto.Uint32(right.index)
+
+		if isComparisonOperator(op) && ((left.isComparison && !left.parenthesized) || (right.isComparison && !right.parenthesized)) {
+			if p.disallowComparisonOperatorChaining {
+				return nil, fmt.Errorf("comparison operator chaining is disallowed; use parentheses or logical operators (e.g. &&) to clarify intent")
+			}
+			log.Printf("Warning: comparison operator chaining detected; this will be disallowed in a future release (opt in now using query parameter disallow_comparison_operator_chaining=true)")
+		}
 	}
 
 	n := pb.Node_builder{
 		CombinationNode: pb.CombinationNode_builder{
-			LeftIndex:  proto.Uint32(left),
+			LeftIndex:  proto.Uint32(left.index),
 			RightIndex: rightIndex,
 		}.Build(),
 	}.Build()
@@ -339,9 +378,13 @@ func (p *ParserShunt) buildCombinationNode(op Operator, operandStack *[]uint32) 
 	return n, nil
 }
 
-func (p *ParserShunt) pushNodeToOperandStack(nod *pb.Node, operandStack *[]uint32) {
+func (p *ParserShunt) pushNodeToOperandStack(nod *pb.Node, operandStack *[]operand, isComparison bool) {
 	id := p.pushNode(nod)
-	*operandStack = append(*operandStack, id)
+	*operandStack = append(*operandStack, operand{
+		index:         id,
+		isComparison:  isComparison,
+		parenthesized: false,
+	})
 }
 
 func (p *ParserShunt) tokenize(source string) ([]token, error) {

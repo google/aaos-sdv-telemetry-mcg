@@ -215,7 +215,7 @@ func TestShuntParseEveryOperator(t *testing.T) {
 	for idx, tc := range cases {
 		sess[uint32(idx)] = expressions.Text{Uncompiled: tc.expression}
 	}
-	p := expressions.NewParserShunt()
+	p := expressions.NewParserShunt(false)
 	mapping, nodes, err := p.CompileAll(sess)
 	if err != nil {
 		t.Fatal(err)
@@ -239,7 +239,7 @@ func TestShuntParseSource(t *testing.T) {
 	sess[2] = expressions.Text{Uncompiled: "my_source.value"}
 	sess[3] = expressions.Text{Uncompiled: "!my_source.subfield.data_present"}
 
-	p := expressions.NewParserShunt()
+	p := expressions.NewParserShunt(false)
 	mapping, nodes, err := p.CompileAll(sess)
 	if err != nil {
 		t.Fatal(err)
@@ -329,7 +329,7 @@ func TestShuntParsePrecedence(t *testing.T) {
 				sess[4] = expressions.Text{Uncompiled: fmt.Sprintf(
 					"1 %s (1 %s 1)", opInfoA.operator, opInfoB.operator,
 				)}
-				p := expressions.NewParserShunt()
+				p := expressions.NewParserShunt(false)
 
 				mapping, nodes, err := p.CompileAll(sess)
 				if err != nil {
@@ -371,7 +371,7 @@ func TestShuntParsePrecedence(t *testing.T) {
 				sess[3] = expressions.Text{Uncompiled: fmt.Sprintf(
 					"%s (abs(1) %s 2)", opInfoU.operator, opInfoA.operator,
 				)}
-				p := expressions.NewParserShunt()
+				p := expressions.NewParserShunt(false)
 				mapping, nodes, err := p.CompileAll(sess)
 				if err != nil {
 					t.Fatal(err)
@@ -409,7 +409,7 @@ func TestShuntParseWhitespace(t *testing.T) {
 	sess := make(map[uint32]expressions.Text)
 	sess[1] = expressions.Text{Uncompiled: string(allWhiteSpace)}
 
-	p := expressions.NewParserShunt()
+	p := expressions.NewParserShunt(false)
 	if _, _, err := p.CompileAll(sess); err != nil {
 		t.Error(err)
 	}
@@ -962,7 +962,7 @@ func TestShuntParseSingleExpressionSuccess(t *testing.T) {
 			sess[1] = expressions.Text{Uncompiled: tc.expression}
 
 			fmt.Println("start test", tc.name)
-			p := expressions.NewParserShunt()
+			p := expressions.NewParserShunt(false)
 			mapping, nodes, err := p.CompileAll(sess)
 			if err != nil {
 				t.Fatal(err)
@@ -1047,7 +1047,7 @@ func TestShuntParseConstantLeafNodeTypes(t *testing.T) {
 			// Use an arbitrary key, as there's only one expression per test case.
 			sess[0] = expressions.Text{Uncompiled: tc.expression}
 
-			p := expressions.NewParserShunt()
+			p := expressions.NewParserShunt(false)
 			mapping, nodes, err := p.CompileAll(sess)
 			if err != nil {
 				t.Fatalf("p.CompileAll(sess) for expression %q failed: %v", tc.expression, err)
@@ -1078,7 +1078,7 @@ func TestShuntParseReuseNodes(t *testing.T) {
 	sess[1] = expressions.Text{Uncompiled: "(2+3*3)/2"}
 	sess[2] = expressions.Text{Uncompiled: "3*3"}
 
-	p := expressions.NewParserShunt()
+	p := expressions.NewParserShunt(false)
 	mapping, nodes, err := p.CompileAll(sess)
 	if err != nil {
 		t.Fatal(err)
@@ -1123,7 +1123,7 @@ func TestShuntParseMissingOperandError(t *testing.T) {
 			sess := make(map[uint32]expressions.Text)
 			sess[uint32(idx)] = expressions.Text{Uncompiled: tc.expression}
 
-			p := expressions.NewParserShunt()
+			p := expressions.NewParserShunt(false)
 			_, _, err := p.CompileAll(sess)
 			if want, got := tc.expectError, err; err == nil || !strings.Contains(got.Error(), tc.expectError) {
 				t.Errorf("p.CompileAll(sess) = _, _, %q, want containing %q", got, want)
@@ -1232,7 +1232,7 @@ func TestShuntParseEdgeCases(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			p := expressions.NewParserShunt()
+			p := expressions.NewParserShunt(false)
 			sess := make(map[uint32]expressions.Text)
 			sess[1] = expressions.Text{Uncompiled: tc.expression}
 
@@ -1244,5 +1244,222 @@ func TestShuntParseEdgeCases(t *testing.T) {
 				t.Errorf("For expression %q, expected error containing %q, but got %q", tc.expression, tc.expectError, err.Error())
 			}
 		})
+	}
+}
+
+func TestShuntParseDisallowComparisonChaining(t *testing.T) {
+	tests := []struct {
+		name           string
+		expression     string
+		wantDisallowed bool
+	}{
+		// --- Blocked when enabled (strict mode), allowed when disabled ---
+		{
+			name:           "lt_lt",
+			expression:     "a < b < c",
+			wantDisallowed: true,
+		},
+		{
+			name:           "lteq_lteq",
+			expression:     "a <= b <= c",
+			wantDisallowed: true,
+		},
+		{
+			name:           "gt_gt",
+			expression:     "a > b > c",
+			wantDisallowed: true,
+		},
+		{
+			name:           "gteq_gteq",
+			expression:     "a >= b >= c",
+			wantDisallowed: true,
+		},
+		{
+			name:           "eq_eq",
+			expression:     "a == b == c",
+			wantDisallowed: true,
+		},
+		{
+			name:           "noteq_noteq",
+			expression:     "a != b != c",
+			wantDisallowed: true,
+		},
+		{
+			name:           "mixed_lt_lteq",
+			expression:     "a < b <= c",
+			wantDisallowed: true,
+		},
+		{
+			name:           "mixed_eq_lt",
+			expression:     "a == b < c",
+			wantDisallowed: true,
+		},
+		{
+			name:           "mixed_lt_eq",
+			expression:     "a < b == c",
+			wantDisallowed: true,
+		},
+		{
+			name:           "mixed_gt_eq",
+			expression:     "a > b == c",
+			wantDisallowed: true,
+		},
+		{
+			name:           "mixed_eq_noteq",
+			expression:     "a == b != c",
+			wantDisallowed: true,
+		},
+		{
+			name:           "long_chain",
+			expression:     "a < b < c < d",
+			wantDisallowed: true,
+		},
+		{
+			name:           "long_mixed_chain",
+			expression:     "a < b <= c == d > e",
+			wantDisallowed: true,
+		},
+		{
+			name:           "chaining_with_arithmetic",
+			expression:     "a + b < c < d * e",
+			wantDisallowed: true,
+		},
+		{
+			name:           "subscript_chaining",
+			expression:     "a < b[0] < c",
+			wantDisallowed: true,
+		},
+		{
+			name:           "chaining_after_logical",
+			expression:     "a < b && b < c < d",
+			wantDisallowed: true,
+		},
+		{
+			name:           "chaining_inside_function",
+			expression:     "floor(a < b < c)",
+			wantDisallowed: true,
+		},
+		{
+			name:           "chaining_inside_not",
+			expression:     "!(a < b < c)",
+			wantDisallowed: true,
+		},
+		{
+			name:           "whole_chain_parenthesized",
+			expression:     "(a < b < c)",
+			wantDisallowed: true,
+		},
+		{
+			name:           "intra_expression_leak_protection",
+			expression:     "(a < b) && a < b < c",
+			wantDisallowed: true,
+		},
+		{
+			name:           "intra_expression_leak_protection_reverse",
+			expression:     "a < b < (a < b)",
+			wantDisallowed: true,
+		},
+
+		// --- Allowed in both default and strict modes (explicit intent) ---
+		{
+			name:           "parenthesized_left",
+			expression:     "(a < b) < c",
+			wantDisallowed: false,
+		},
+		{
+			name:           "subscript_parenthesized",
+			expression:     "(a < b[0]) < c",
+			wantDisallowed: false,
+		},
+		{
+			name:           "parenthesized_right",
+			expression:     "a < (b <= c)",
+			wantDisallowed: false,
+		},
+		{
+			name:           "parenthesized_logical",
+			expression:     "(a < b) == (c < d)",
+			wantDisallowed: false,
+		},
+		{
+			name:           "logical_and",
+			expression:     "a < b && b < c",
+			wantDisallowed: false,
+		},
+		{
+			name:           "function_like_contains",
+			expression:     "contains(source.field, 5) == true",
+			wantDisallowed: false,
+		},
+		{
+			name:           "relation_inside_function_argument",
+			expression:     "contains(a < b, source)",
+			wantDisallowed: false,
+		},
+		{
+			name:           "function_like_alleq",
+			expression:     "alleq(source.field, true) == true",
+			wantDisallowed: false,
+		},
+		{
+			name:           "parenthesized_mixed",
+			expression:     "(a == b) != c",
+			wantDisallowed: false,
+		},
+		{
+			name:           "function_and_relational",
+			expression:     "contains(a, b) && c < d",
+			wantDisallowed: false,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			sess := map[uint32]expressions.Text{
+				1: {Uncompiled: tc.expression},
+			}
+
+			// Test with chaining allowed (disallow = false)
+			pAllowed := expressions.NewParserShunt(false)
+			if _, _, err := pAllowed.CompileAll(sess); err != nil {
+				t.Errorf("CompileAll(%q) with disallow=false unexpected error: %v", tc.expression, err)
+			}
+
+			// Test with chaining disallowed (disallow = true)
+			pDisallowed := expressions.NewParserShunt(true)
+			_, _, err := pDisallowed.CompileAll(sess)
+			if tc.wantDisallowed {
+				if err == nil {
+					t.Fatalf("CompileAll(%q) with disallow=true expected error, got nil", tc.expression)
+				}
+				if !strings.Contains(err.Error(), "comparison operator chaining is disallowed") {
+					t.Errorf("CompileAll(%q) with disallow=true expected error containing %q, got: %q", tc.expression, "comparison operator chaining is disallowed", err.Error())
+				}
+			} else {
+				if err != nil {
+					t.Fatalf("CompileAll(%q) with disallow=true unexpected error: %v", tc.expression, err)
+				}
+			}
+		})
+	}
+}
+
+func TestShuntParseDisallowComparisonChaining_InterExpressionLeak(t *testing.T) {
+	// Compile multiple expressions in the same session.
+	// Expr 1 is parenthesized: (a < b)
+	// Expr 2 is chained: a < b < c
+	// If there is inter-expression leakage, Expr 2 might incorrectly succeed
+	// because the node index for "a < b" (deduplicated) was marked parenthesized in Expr 1.
+	sess := map[uint32]expressions.Text{
+		1: {Uncompiled: "(a < b)"},
+		2: {Uncompiled: "a < b < c"},
+	}
+	p := expressions.NewParserShunt(true)
+	_, _, err := p.CompileAll(sess)
+	if err == nil {
+		t.Fatalf("CompileAll(%v) expected error due to comparison operator chaining in expression 2, but got none", sess)
+	}
+	if !strings.Contains(err.Error(), "comparison operator chaining is disallowed") {
+		t.Errorf("CompileAll(%v) expected error containing %q, got: %q", sess, "comparison operator chaining is disallowed", err.Error())
 	}
 }

@@ -1300,3 +1300,74 @@ func TestNoMessageInference(t *testing.T) {
 
 	testhelper.AssertMetricsConfigEqual(t, &expected, &result, opts...)
 }
+
+func TestDisallowComparisonOperatorChainingAPI(t *testing.T) {
+	ctx := context.Background()
+	router, _ := setupServer(ctx, t, false)
+
+	// A minimal payload with a chained expression.
+	// We use ignore_validation=true and no_inference=true to bypass complex validation/inference checks,
+	// while still triggering the expression parser.
+	chainedPayload := `{
+		"report_configs": [{
+			"name": "report1",
+			"report_incomplete": true,
+			"message_builder": {
+				"message_type": ".google.protobuf.Int32Value",
+				"field_assignments": [{
+					"field_name": "value",
+					"aggregation": {
+						"@type": "none",
+						"expression": "a < b < c"
+					}
+				}]
+			}
+		}]
+	}`
+
+	for _, apiVersion := range []string{"v1", "v2"} {
+		t.Run(fmt.Sprintf("api_%s", apiVersion), func(t *testing.T) {
+			// 1. Chaining disallowed (should fail)
+			w := performPostRequest(router,
+				fmt.Sprintf("/api/%s/generate_metrics_config?disallow_comparison_operator_chaining=true&ignore_validation=true&no_inference=true", apiVersion),
+				"application/json", "application/x-protobuf", []byte(chainedPayload))
+
+			if want, got := http.StatusBadRequest, w.Result().StatusCode; want != got {
+				t.Errorf("POST with disallow_comparison_operator_chaining=true returned status %d, want %d. Body: %s", got, want, w.Body.String())
+			}
+			if got := w.Body.String(); !strings.Contains(got, "comparison operator chaining is disallowed") {
+				t.Errorf("expected error message containing 'comparison operator chaining is disallowed', got: %q", got)
+			}
+
+			// 2. Chaining allowed by default (should succeed)
+			w2 := performPostRequest(router,
+				fmt.Sprintf("/api/%s/generate_metrics_config?ignore_validation=true&no_inference=true", apiVersion),
+				"application/json", "application/x-protobuf", []byte(chainedPayload))
+
+			if want, got := http.StatusOK, w2.Result().StatusCode; want != got {
+				t.Errorf("POST without disallow_comparison_operator_chaining returned status %d, want %d. Body: %s", got, want, w2.Body.String())
+			}
+
+			// 3. Chaining explicitly allowed (should succeed)
+			w3 := performPostRequest(router,
+				fmt.Sprintf("/api/%s/generate_metrics_config?disallow_comparison_operator_chaining=false&ignore_validation=true&no_inference=true", apiVersion),
+				"application/json", "application/x-protobuf", []byte(chainedPayload))
+
+			if want, got := http.StatusOK, w3.Result().StatusCode; want != got {
+				t.Errorf("POST with disallow_comparison_operator_chaining=false returned status %d, want %d. Body: %s", got, want, w3.Body.String())
+			}
+
+			// 4. Invalid boolean parameter (should fail)
+			w4 := performPostRequest(router,
+				fmt.Sprintf("/api/%s/generate_metrics_config?disallow_comparison_operator_chaining=invalidBool&ignore_validation=true&no_inference=true", apiVersion),
+				"application/json", "application/x-protobuf", []byte(chainedPayload))
+
+			if want, got := http.StatusBadRequest, w4.Result().StatusCode; want != got {
+				t.Errorf("POST with invalid disallow_comparison_operator_chaining returned status %d, want %d. Body: %s", got, want, w4.Body.String())
+			}
+			if got := w4.Body.String(); !strings.Contains(got, "Failed to parse boolean value") {
+				t.Errorf("expected error message containing 'Failed to parse boolean value', got: %q", got)
+			}
+		})
+	}
+}

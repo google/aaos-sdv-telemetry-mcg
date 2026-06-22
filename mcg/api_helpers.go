@@ -377,7 +377,7 @@ func getReportConfigsWithReplacedIndices(mapping map[uint32]uint32, sessReports 
 //   - s.ConfigUUID is set
 //   - None of the maps in the session are nil
 func compileSession(sess *session.Session) (*pb.MetricsConfig, []*mcgerrors.StatusError, string) {
-	exprParser := expressions.NewParserShunt()
+	exprParser := expressions.NewParserShunt(sess.DisallowComparisonOperatorChaining)
 
 	mapping, nodes, err := exprParser.CompileAll(sess.Expressions)
 	if err != nil {
@@ -430,6 +430,18 @@ func getIgnoreValidationQueryParamValue(c *gin.Context) (bool, *mcgerrors.Status
 
 func getNoInferenceQueryParamValue(c *gin.Context) (bool, *mcgerrors.StatusError) {
 	return getQueryParamBoolValue(c, "no_inference")
+}
+
+// getDisallowComparisonOperatorChainingQueryParamValue extracts the disallow_comparison_operator_chaining query parameter.
+//
+// TODO - b/526550692: This parameter is temporarily introduced as opt-in
+// (defaulting to false) to maintain backward compatibility with existing
+// clients. In the next phase, the default should be updated to true to disallow
+// comparison operator chaining by default. Once all clients have migrated to
+// explicitly parenthesize their expressions where needed, this parameter and
+// its associated enforcement logic should be completely removed.
+func getDisallowComparisonOperatorChainingQueryParamValue(c *gin.Context) (bool, *mcgerrors.StatusError) {
+	return getQueryParamBoolValue(c, "disallow_comparison_operator_chaining")
 }
 
 func getReturnConfigQueryParamValue(c *gin.Context) (bool, *mcgerrors.StatusError) {

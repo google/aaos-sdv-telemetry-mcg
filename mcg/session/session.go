@@ -79,6 +79,9 @@ type Session struct {
 
 	// Retain the state of aggregations when the metrics config is stopped.
 	RetainAggregationsOnStop bool
+
+	// DisallowComparisonOperatorChaining disallows chaining of comparison operators.
+	DisallowComparisonOperatorChaining bool
 }
 
 // Save an expression into the session using a session-scoped expression ID.

@@ -82,6 +82,13 @@ func handleCompile(apiVersion constants.APIVersion) gin.HandlerFunc {
 		}
 		sess.NoMessageInference = noInference
 
+		disallowChaining, statusErr := getDisallowComparisonOperatorChainingQueryParamValue(c)
+		if statusErr != nil {
+			c.Error(statusErr)
+			return
+		}
+		sess.DisallowComparisonOperatorChaining = disallowChaining
+
 		mc, errorList, errorMessage := compileSession(sess)
 		if len(errorList) > 0 {
 			c.JSON(http.StatusBadRequest, mcgerrors.FlattenErrorList(code.Code_INVALID_ARGUMENT, errorMessage, errorList))
