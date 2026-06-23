@@ -655,3 +655,82 @@ func TestResolveFieldLeafNodeLabelCoercion(t *testing.T) {
 		})
 	}
 }
+
+func TestResolveListExpressions(t *testing.T) {
+	mockGetDescriptorProto := func(name protoreflect.FullName) *descriptorpb.DescriptorProto {
+		if name == "pkg.Message" {
+			return &descriptorpb.DescriptorProto{
+				Name: proto.String("Message"),
+				Field: []*descriptorpb.FieldDescriptorProto{
+					{
+						Name:  proto.String("repeated_int"),
+						Type:  descriptorpb.FieldDescriptorProto_TYPE_INT32.Enum(),
+						Label: descriptorpb.FieldDescriptorProto_LABEL_REPEATED.Enum(),
+					},
+					{
+						Name:  proto.String("singular_int"),
+						Type:  descriptorpb.FieldDescriptorProto_TYPE_INT32.Enum(),
+						Label: descriptorpb.FieldDescriptorProto_LABEL_OPTIONAL.Enum(),
+					},
+				},
+			}
+		}
+		return nil
+	}
+
+	mockGetSourceMessageName := func(sourceName string) (protoreflect.FullName, error) {
+		if sourceName == "my_source" {
+			return protoreflect.FullName("pkg.Message"), nil
+		}
+		return "", fmt.Errorf("unknown source: %s", sourceName)
+	}
+
+	config := pb.MetricsConfig_builder{
+		ExpressionNodes: []*pb.Node{
+			// Index 0: repeated_int
+			pb.Node_builder{FieldLeafNode: pb.FieldLeafNode_builder{SourceName: "my_source", FieldNames: []string{"repeated_int"}}.Build()}.Build(),
+			// Index 1: singular_int
+			pb.Node_builder{FieldLeafNode: pb.FieldLeafNode_builder{SourceName: "my_source", FieldNames: []string{"singular_int"}}.Build()}.Build(),
+		},
+	}.Build()
+
+	er := NewExpressionResolver(config.GetExpressionNodes(), mockGetSourceMessageName, mockGetDescriptorProto)
+
+	tests := []struct {
+		name     string
+		node     *pb.CombinationNode
+		wantDesc *descriptorpb.FieldDescriptorProto
+		wantErr  bool
+	}{
+		{
+			name: "length(repeated_int) -> INT32",
+			node: pb.CombinationNode_builder{
+				ListOperator: pb.CombinationNode_LENGTH.Enum(),
+				LeftIndex:    proto.Uint32(0),
+			}.Build(),
+			wantDesc: &descriptorpb.FieldDescriptorProto{Type: descriptorpb.FieldDescriptorProto_TYPE_INT64.Enum()},
+		},
+		{
+			name: "length(singular_int) -> error",
+			node: pb.CombinationNode_builder{
+				ListOperator: pb.CombinationNode_LENGTH.Enum(),
+				LeftIndex:    proto.Uint32(1),
+			}.Build(),
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			desc, err := er.resolveListExpressions(tt.node)
+			if (err != nil) != tt.wantErr {
+				t.Fatalf("got error %v, wantErr %v", err, tt.wantErr)
+			}
+			if !tt.wantErr {
+				if diff := cmp.Diff(tt.wantDesc, desc, protocmp.Transform()); diff != "" {
+					t.Errorf("Resolve() returned unexpected descriptor diff (-want +got):\n%s", diff)
+				}
+			}
+		})
+	}
+}

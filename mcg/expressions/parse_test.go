@@ -196,6 +196,13 @@ func TestShuntParseEveryOperator(t *testing.T) {
 				RelationalOperator: pb.CombinationNode_DOES_NOT_CONTAIN.Enum(),
 			}.Build(),
 		},
+		{
+			name:       "op_length",
+			expression: "length(source.field_3)",
+			expectOp: pb.CombinationNode_builder{
+				ListOperator: pb.CombinationNode_LENGTH.Enum(),
+			}.Build(),
+		},
 	}
 	sess := make(map[uint32]expressions.Text)
 	for idx, tc := range cases {
@@ -1114,6 +1121,11 @@ func TestShuntParseEdgeCases(t *testing.T) {
 			name:        "missing_operands",
 			expression:  "1 + -",
 			expectError: "FAILED_PRECONDITION: Failed to parse expression \"1 + -\": Missing operand(s) for binary operator: OperatorAdd",
+		},
+		{
+			name:        "empty_length",
+			expression:  "length()",
+			expectError: "FAILED_PRECONDITION: Failed to parse expression \"length()\": Missing operand for unary operator: OperatorLength",
 		},
 	}
 

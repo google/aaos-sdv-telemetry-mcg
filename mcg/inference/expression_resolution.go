@@ -200,6 +200,8 @@ func (er *ExpressionResolver) resolveCombinationNode(expNode *pb.CombinationNode
 		fieldDesc.Type = descriptorpb.FieldDescriptorProto_TYPE_INT64.Enum()
 	case pb.CombinationNode_ArithmeticOperator_case:
 		return er.resolveArithExpressions(expNode)
+	case pb.CombinationNode_ListOperator_case:
+		return er.resolveListExpressions(expNode)
 	default:
 		return nil, fmt.Errorf("Unknown Combination Node Operator %q", expNode.WhichOperator().String())
 	}
@@ -256,5 +258,25 @@ func (er *ExpressionResolver) resolveArithExpressions(expNode *pb.CombinationNod
 		}
 	default:
 		return nil, fmt.Errorf("Unknown ArithmeticOperator %q", expNode.GetArithmeticOperator())
+	}
+}
+
+func (er *ExpressionResolver) resolveListExpressions(expNode *pb.CombinationNode) (*descriptorpb.FieldDescriptorProto, error) {
+	fieldDesc := &descriptorpb.FieldDescriptorProto{}
+	op := expNode.GetListOperator()
+	switch op {
+	case pb.CombinationNode_LENGTH:
+		leftFieldDesc, err := er.Resolve(expNode.GetLeftIndex())
+		if err != nil {
+			return nil, err
+		}
+		if leftFieldDesc.GetLabel() != descriptorpb.FieldDescriptorProto_LABEL_REPEATED {
+			return nil, fmt.Errorf("length operator can only be applied to repeated fields, got %v", leftFieldDesc.GetLabel())
+		}
+		fieldDesc.Type = descriptorpb.FieldDescriptorProto_TYPE_INT64.Enum()
+		return fieldDesc, nil
+
+	default:
+		return nil, fmt.Errorf("Unknown ListOperator %q", op)
 	}
 }

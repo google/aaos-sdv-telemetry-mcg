@@ -158,7 +158,7 @@ func (p *ParserShunt) compileOne(source string) (uint32, error) {
 			p.pushNodeToOperandStack(ttok, &operandStack)
 		case Operator:
 			switch ttok {
-			case OperatorAllEq, OperatorContains, OperatorDoesNotContain, OperatorFloor, OperatorRound, OperatorCeil, OperatorAbsolute, OperatorUnaryMinus:
+			case OperatorAllEq, OperatorContains, OperatorDoesNotContain, OperatorFloor, OperatorRound, OperatorCeil, OperatorAbsolute, OperatorUnaryMinus, OperatorLength:
 				operatorStack = append(operatorStack, ttok)
 			case OperatorLeftParen:
 				operatorStack = append(operatorStack, ttok)
@@ -208,7 +208,7 @@ func (p *ParserShunt) compileOne(source string) (uint32, error) {
 // Returns true if of uses parentheses like a function call
 func isFunctionLike(op Operator) bool {
 	switch op {
-	case OperatorAllEq, OperatorContains, OperatorDoesNotContain, OperatorFloor, OperatorRound, OperatorCeil, OperatorAbsolute, OperatorUnaryMinus:
+	case OperatorAllEq, OperatorContains, OperatorDoesNotContain, OperatorFloor, OperatorRound, OperatorCeil, OperatorAbsolute, OperatorUnaryMinus, OperatorLength:
 		return true
 	default:
 		return false
@@ -251,7 +251,7 @@ func (p *ParserShunt) getOperatorToProto(op Operator) *pb.CombinationNode {
 func (p *ParserShunt) buildCombinationNode(op Operator, operandStack *[]uint32) (*pb.Node, error) {
 	var left, right uint32
 	var rightIndex *uint32
-	isUnaryOperator := op == OperatorFloor || op == OperatorRound || op == OperatorCeil || op == OperatorNot || op == OperatorAbsolute || op == OperatorUnaryMinus
+	isUnaryOperator := op == OperatorFloor || op == OperatorRound || op == OperatorCeil || op == OperatorNot || op == OperatorAbsolute || op == OperatorUnaryMinus || op == OperatorLength
 
 	if isUnaryOperator {
 		if len(*operandStack) < 1 {
@@ -281,6 +281,8 @@ func (p *ParserShunt) buildCombinationNode(op Operator, operandStack *[]uint32) 
 	// go/keep-sorted start
 	case pb.CombinationNode_ArithmeticOperator_case:
 		n.GetCombinationNode().SetArithmeticOperator(operator.GetArithmeticOperator())
+	case pb.CombinationNode_ListOperator_case:
+		n.GetCombinationNode().SetListOperator(operator.GetListOperator())
 	case pb.CombinationNode_LogicalOperator_case:
 		n.GetCombinationNode().SetLogicalOperator(operator.GetLogicalOperator())
 	case pb.CombinationNode_RelationalOperator_case:
@@ -494,6 +496,8 @@ func parseValue(s string) (token, error) {
 		return OperatorCeil, nil
 	case "abs":
 		return OperatorAbsolute, nil
+	case "length":
+		return OperatorLength, nil
 	}
 
 	i32, err := strconv.ParseInt(s, 10, 32)
@@ -536,6 +540,7 @@ const (
 	OperatorGt
 	OperatorGtEq
 	OperatorLeftParen
+	OperatorLength
 	OperatorLt
 	OperatorLtEq
 	OperatorModulo
@@ -564,7 +569,7 @@ var precedence []int8 = []int8{
 	OperatorAdd: 12, OperatorSubtract: 12, OperatorUnaryMinus: 12,
 	OperatorMultiply: 13, OperatorDivide: 13, OperatorModulo: 13,
 	OperatorNot:   14,
-	OperatorPower: 15, OperatorAllEq: 15, OperatorContains: 15, OperatorDoesNotContain: 15, OperatorFloor: 15, OperatorRound: 15, OperatorCeil: 15, OperatorAbsolute: 15,
+	OperatorPower: 15, OperatorAllEq: 15, OperatorContains: 15, OperatorDoesNotContain: 15, OperatorFloor: 15, OperatorRound: 15, OperatorCeil: 15, OperatorAbsolute: 15, OperatorLength: 15,
 }
 
 var operatorToProto []*pb.CombinationNode = []*pb.CombinationNode{
@@ -581,6 +586,7 @@ var operatorToProto []*pb.CombinationNode = []*pb.CombinationNode{
 	OperatorFloor:          pb.CombinationNode_builder{RoundingOperator: pb.CombinationNode_FLOOR.Enum()}.Build(),
 	OperatorGt:             pb.CombinationNode_builder{RelationalOperator: pb.CombinationNode_GT.Enum()}.Build(),
 	OperatorGtEq:           pb.CombinationNode_builder{RelationalOperator: pb.CombinationNode_GT_OR_EQ.Enum()}.Build(),
+	OperatorLength:         pb.CombinationNode_builder{ListOperator: pb.CombinationNode_LENGTH.Enum()}.Build(),
 	OperatorLt:             pb.CombinationNode_builder{RelationalOperator: pb.CombinationNode_LT.Enum()}.Build(),
 	OperatorLtEq:           pb.CombinationNode_builder{RelationalOperator: pb.CombinationNode_LT_OR_EQ.Enum()}.Build(),
 	OperatorModulo:         pb.CombinationNode_builder{ArithmeticOperator: pb.CombinationNode_MODULO_TRUNC.Enum()}.Build(),
@@ -644,6 +650,8 @@ func parseOperator(s string) (token, error) {
 		return OperatorRound, nil
 	case "abs":
 		return OperatorAbsolute, nil
+	case "length":
+		return OperatorLength, nil
 	}
 	return nil, fmt.Errorf("Unknown operator %q", s)
 }
@@ -668,6 +676,7 @@ var operatorToString []string = []string{
 	OperatorGt:             "OperatorGt",
 	OperatorGtEq:           "OperatorGtEq",
 	OperatorLeftParen:      "OperatorLeftParen",
+	OperatorLength:         "OperatorLength",
 	OperatorLt:             "OperatorLt",
 	OperatorLtEq:           "OperatorLtEq",
 	OperatorModulo:         "OperatorModulo",
