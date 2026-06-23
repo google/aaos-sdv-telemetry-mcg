@@ -203,6 +203,13 @@ func TestShuntParseEveryOperator(t *testing.T) {
 				ListOperator: pb.CombinationNode_LENGTH.Enum(),
 			}.Build(),
 		},
+		{
+			name:       "op_subscript",
+			expression: "source.field_4[0]",
+			expectOp: pb.CombinationNode_builder{
+				ListOperator: pb.CombinationNode_SUBSCRIPT.Enum(),
+			}.Build(),
+		},
 	}
 	sess := make(map[uint32]expressions.Text)
 	for idx, tc := range cases {
@@ -868,6 +875,85 @@ func TestShuntParseSingleExpressionSuccess(t *testing.T) {
 				}.Build(),
 			},
 		},
+		{
+			name:       "test_subscript_with_index_expression",
+			expression: "source[length(source) / 2 + 5]",
+			expectRoot: 6,
+			expect: []*pb.Node{
+				pb.Node_builder{
+					FieldLeafNode: pb.FieldLeafNode_builder{
+						SourceName: "source",
+					}.Build(),
+				}.Build(),
+				pb.Node_builder{
+					CombinationNode: pb.CombinationNode_builder{
+						LeftIndex:    proto.Uint32(0),
+						ListOperator: pb.CombinationNode_LENGTH.Enum(),
+					}.Build(),
+				}.Build(),
+				pb.Node_builder{
+					ConstantLeafNode: pb.ConstantLeafNode_builder{
+						Int32Value: proto.Int32(2),
+					}.Build(),
+				}.Build(),
+				pb.Node_builder{
+					CombinationNode: pb.CombinationNode_builder{
+						LeftIndex:          proto.Uint32(1),
+						RightIndex:         proto.Uint32(2),
+						ArithmeticOperator: pb.CombinationNode_DIVIDE.Enum(),
+					}.Build(),
+				}.Build(),
+				pb.Node_builder{
+					ConstantLeafNode: pb.ConstantLeafNode_builder{
+						Int32Value: proto.Int32(5),
+					}.Build(),
+				}.Build(),
+				pb.Node_builder{
+					CombinationNode: pb.CombinationNode_builder{
+						LeftIndex:          proto.Uint32(3),
+						RightIndex:         proto.Uint32(4),
+						ArithmeticOperator: pb.CombinationNode_ADD.Enum(),
+					}.Build(),
+				}.Build(),
+				pb.Node_builder{
+					CombinationNode: pb.CombinationNode_builder{
+						LeftIndex:    proto.Uint32(0),
+						RightIndex:   proto.Uint32(5),
+						ListOperator: pb.CombinationNode_SUBSCRIPT.Enum(),
+					}.Build(),
+				}.Build(),
+			},
+		},
+		{
+			name:       "test_subscript_negative_index",
+			expression: "-source[-1]",
+			expectRoot: 3,
+			expect: []*pb.Node{
+				pb.Node_builder{
+					FieldLeafNode: pb.FieldLeafNode_builder{
+						SourceName: "source",
+					}.Build(),
+				}.Build(),
+				pb.Node_builder{
+					ConstantLeafNode: pb.ConstantLeafNode_builder{
+						Int32Value: proto.Int32(-1),
+					}.Build(),
+				}.Build(),
+				pb.Node_builder{
+					CombinationNode: pb.CombinationNode_builder{
+						LeftIndex:    proto.Uint32(0),
+						RightIndex:   proto.Uint32(1),
+						ListOperator: pb.CombinationNode_SUBSCRIPT.Enum(),
+					}.Build(),
+				}.Build(),
+				pb.Node_builder{
+					CombinationNode: pb.CombinationNode_builder{
+						LeftIndex:          proto.Uint32(2),
+						ArithmeticOperator: pb.CombinationNode_UNARY_MINUS.Enum(),
+					}.Build(),
+				}.Build(),
+			},
+		},
 	}
 
 	for _, tc := range cases {
@@ -1126,6 +1212,16 @@ func TestShuntParseEdgeCases(t *testing.T) {
 			name:        "empty_length",
 			expression:  "length()",
 			expectError: "FAILED_PRECONDITION: Failed to parse expression \"length()\": Missing operand for unary operator: OperatorLength",
+		},
+		{
+			name:        "op_subscript_missing_index",
+			expression:  "source[]",
+			expectError: "FAILED_PRECONDITION: Failed to parse expression \"source[]\": Missing operand(s) for binary operator: OperatorSubscript",
+		},
+		{
+			name:        "name_tbd",
+			expression:  "true&&[5]",
+			expectError: "FAILED_PRECONDITION: Failed to parse expression \"true&&[5]\": Missing operand(s) for binary operator: OperatorAnd",
 		},
 	}
 

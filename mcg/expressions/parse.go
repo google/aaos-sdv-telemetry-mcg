@@ -166,6 +166,26 @@ func (p *ParserShunt) compileOne(source string) (uint32, error) {
 				if err := p.handleRightParen(&operandStack, &operatorStack); err != nil {
 					return 0, mcgerrors.InvalidExpressionError(source, err)
 				}
+			case OperatorLeftSquareBracket:
+				ttokSub := OperatorSubscript
+				for len(operatorStack) >= 1 {
+					lastOp := operatorStack[len(operatorStack)-1]
+					if precedence[lastOp] < precedence[ttokSub] {
+						break
+					}
+					operatorStack = operatorStack[:len(operatorStack)-1]
+					n, err := p.buildCombinationNode(lastOp, &operandStack)
+					if err != nil {
+						return 0, mcgerrors.InvalidExpressionError(source, err)
+					}
+					p.pushNodeToOperandStack(n, &operandStack)
+				}
+				operatorStack = append(operatorStack, OperatorSubscript)
+				operatorStack = append(operatorStack, OperatorLeftSquareBracket)
+			case OperatorRightSquareBracket:
+				if err := p.handleRightSquareBracket(&operandStack, &operatorStack); err != nil {
+					return 0, mcgerrors.InvalidExpressionError(source, err)
+				}
 			default:
 				for len(operatorStack) >= 1 {
 					lastOp := operatorStack[len(operatorStack)-1]
@@ -186,6 +206,9 @@ func (p *ParserShunt) compileOne(source string) (uint32, error) {
 	for len(operatorStack) >= 1 {
 		if slices.Contains(operatorStack, OperatorLeftParen) {
 			return 0, mcgerrors.InvalidExpressionError(source, fmt.Errorf("Found opening parenthesis without matching closing parenthesis"))
+		}
+		if slices.Contains(operatorStack, OperatorLeftSquareBracket) {
+			return 0, mcgerrors.InvalidExpressionError(source, fmt.Errorf("Found opening square bracket without matching closing square bracket"))
 		}
 
 		lastOp := operatorStack[len(operatorStack)-1]
@@ -241,6 +264,28 @@ func (p *ParserShunt) handleRightParen(operandStack *[]uint32, operatorStack *[]
 	}
 
 	return fmt.Errorf("Found closing parenthesis without matching opening parenthesis")
+}
+
+func (p *ParserShunt) handleRightSquareBracket(operandStack *[]uint32, operatorStack *[]Operator) error {
+	for len(*operatorStack) > 0 {
+		op := (*operatorStack)[len(*operatorStack)-1]
+		*operatorStack = (*operatorStack)[:len(*operatorStack)-1]
+
+		if op == OperatorLeftSquareBracket {
+			if len(*operatorStack) == 0 || (*operatorStack)[len(*operatorStack)-1] != OperatorSubscript {
+				return fmt.Errorf("Found square bracket without matching subscript operator")
+			}
+			return nil
+		}
+
+		n, err := p.buildCombinationNode(op, operandStack)
+		if err != nil {
+			return err
+		}
+		p.pushNodeToOperandStack(n, operandStack)
+	}
+
+	return fmt.Errorf("Found closing square bracket without matching opening square bracket")
 }
 
 func (p *ParserShunt) getOperatorToProto(op Operator) *pb.CombinationNode {
@@ -348,6 +393,10 @@ func (p *ParserShunt) tokenize(source string) ([]token, error) {
 			tokens = append(tokens, OperatorLeftParen)
 		} else if c == ')' {
 			tokens = append(tokens, OperatorRightParen)
+		} else if c == '[' {
+			tokens = append(tokens, OperatorLeftSquareBracket)
+		} else if c == ']' {
+			tokens = append(tokens, OperatorRightSquareBracket)
 		} else if c == ',' {
 			// skip commas
 		} else if unicode.IsSpace(c) {
@@ -373,7 +422,7 @@ func isLastTokenOperator(tok []token) bool {
 		return true
 	}
 	op, ok := tok[len(tok)-1].(Operator)
-	if ok && op == OperatorRightParen {
+	if ok && (op == OperatorRightParen || op == OperatorRightSquareBracket) {
 		return false
 	}
 	return ok
@@ -382,7 +431,7 @@ func isLastTokenOperator(tok []token) bool {
 var (
 	rgxNumber             = regexp.MustCompile("^[0-9.]+")
 	rgxNumberOrIdentifier = regexp.MustCompile("^[0-9a-zA-Z._]+")
-	rgxEndOperator        = regexp.MustCompile("[0-9a-zA-Z._)(" + rgxFragSpaces + rgxUnaryMinus + "]")
+	rgxEndOperator        = regexp.MustCompile("[0-9a-zA-Z._)(" + rgxFragSpaces + rgxUnaryMinus + "\\[\\]]")
 	// All space characters in Latin-1 plus the Z character class
 	rgxFragSpaces = ` \t\n\v\f\r\x85\xa0\pZ`
 	// A unary minus can directly follow another operator and as such needs to
@@ -540,6 +589,7 @@ const (
 	OperatorGt
 	OperatorGtEq
 	OperatorLeftParen
+	OperatorLeftSquareBracket
 	OperatorLength
 	OperatorLt
 	OperatorLtEq
@@ -550,7 +600,9 @@ const (
 	OperatorOr
 	OperatorPower
 	OperatorRightParen
+	OperatorRightSquareBracket
 	OperatorRound
+	OperatorSubscript
 	OperatorSubtract
 	OperatorUnaryMinus
 	OperatorXor
@@ -560,7 +612,7 @@ const (
 // LINT.ThenChange(parse_test.go)
 
 var precedence []int8 = []int8{
-	OperatorInvalid: 0, OperatorLeftParen: 0, OperatorRightParen: 0,
+	OperatorInvalid: 0, OperatorLeftParen: 0, OperatorRightParen: 0, OperatorLeftSquareBracket: 0, OperatorRightSquareBracket: 0,
 	OperatorOr:  4,
 	OperatorAnd: 5,
 	OperatorXor: 7,
@@ -569,7 +621,7 @@ var precedence []int8 = []int8{
 	OperatorAdd: 12, OperatorSubtract: 12, OperatorUnaryMinus: 12,
 	OperatorMultiply: 13, OperatorDivide: 13, OperatorModulo: 13,
 	OperatorNot:   14,
-	OperatorPower: 15, OperatorAllEq: 15, OperatorContains: 15, OperatorDoesNotContain: 15, OperatorFloor: 15, OperatorRound: 15, OperatorCeil: 15, OperatorAbsolute: 15, OperatorLength: 15,
+	OperatorPower: 15, OperatorAllEq: 15, OperatorContains: 15, OperatorDoesNotContain: 15, OperatorFloor: 15, OperatorRound: 15, OperatorCeil: 15, OperatorAbsolute: 15, OperatorLength: 15, OperatorSubscript: 15,
 }
 
 var operatorToProto []*pb.CombinationNode = []*pb.CombinationNode{
@@ -596,6 +648,7 @@ var operatorToProto []*pb.CombinationNode = []*pb.CombinationNode{
 	OperatorOr:             pb.CombinationNode_builder{LogicalOperator: pb.CombinationNode_OR.Enum()}.Build(),
 	OperatorPower:          pb.CombinationNode_builder{ArithmeticOperator: pb.CombinationNode_POWER.Enum()}.Build(),
 	OperatorRound:          pb.CombinationNode_builder{RoundingOperator: pb.CombinationNode_ROUND.Enum()}.Build(),
+	OperatorSubscript:      pb.CombinationNode_builder{ListOperator: pb.CombinationNode_SUBSCRIPT.Enum()}.Build(),
 	OperatorSubtract:       pb.CombinationNode_builder{ArithmeticOperator: pb.CombinationNode_SUBTRACT.Enum()}.Build(),
 	OperatorUnaryMinus:     pb.CombinationNode_builder{ArithmeticOperator: pb.CombinationNode_UNARY_MINUS.Enum()}.Build(),
 	OperatorXor:            pb.CombinationNode_builder{LogicalOperator: pb.CombinationNode_XOR.Enum()}.Build(),
@@ -663,32 +716,35 @@ func (op Operator) String() string {
 
 var operatorToString []string = []string{
 	// go/keep-sorted start
-	OperatorAbsolute:       "OperatorAbsolute",
-	OperatorAdd:            "OperatorAdd",
-	OperatorAllEq:          "OperatorAllEq",
-	OperatorAnd:            "OperatorAnd",
-	OperatorCeil:           "OperatorCeil",
-	OperatorContains:       "OperatorContains",
-	OperatorDivide:         "OperatorDivide",
-	OperatorDoesNotContain: "OperatorDoesNotContain",
-	OperatorEq:             "OperatorEq",
-	OperatorFloor:          "OperatorFloor",
-	OperatorGt:             "OperatorGt",
-	OperatorGtEq:           "OperatorGtEq",
-	OperatorLeftParen:      "OperatorLeftParen",
-	OperatorLength:         "OperatorLength",
-	OperatorLt:             "OperatorLt",
-	OperatorLtEq:           "OperatorLtEq",
-	OperatorModulo:         "OperatorModulo",
-	OperatorMultiply:       "OperatorMultiply",
-	OperatorNot:            "OperatorNot",
-	OperatorNotEq:          "OperatorNotEq",
-	OperatorOr:             "OperatorOr",
-	OperatorPower:          "OperatorPower",
-	OperatorRightParen:     "OperatorRightParen",
-	OperatorRound:          "OperatorRound",
-	OperatorSubtract:       "OperatorSubtract",
-	OperatorUnaryMinus:     "OperatorUnaryMinus",
-	OperatorXor:            "OperatorXor",
+	OperatorAbsolute:           "OperatorAbsolute",
+	OperatorAdd:                "OperatorAdd",
+	OperatorAllEq:              "OperatorAllEq",
+	OperatorAnd:                "OperatorAnd",
+	OperatorCeil:               "OperatorCeil",
+	OperatorContains:           "OperatorContains",
+	OperatorDivide:             "OperatorDivide",
+	OperatorDoesNotContain:     "OperatorDoesNotContain",
+	OperatorEq:                 "OperatorEq",
+	OperatorFloor:              "OperatorFloor",
+	OperatorGt:                 "OperatorGt",
+	OperatorGtEq:               "OperatorGtEq",
+	OperatorLeftParen:          "OperatorLeftParen",
+	OperatorLeftSquareBracket:  "OperatorLeftSquareBracket",
+	OperatorLength:             "OperatorLength",
+	OperatorLt:                 "OperatorLt",
+	OperatorLtEq:               "OperatorLtEq",
+	OperatorModulo:             "OperatorModulo",
+	OperatorMultiply:           "OperatorMultiply",
+	OperatorNot:                "OperatorNot",
+	OperatorNotEq:              "OperatorNotEq",
+	OperatorOr:                 "OperatorOr",
+	OperatorPower:              "OperatorPower",
+	OperatorRightParen:         "OperatorRightParen",
+	OperatorRightSquareBracket: "OperatorRightSquareBracket",
+	OperatorRound:              "OperatorRound",
+	OperatorSubtract:           "OperatorSubtract",
+	OperatorSubscript:          "OperatorSubscript",
+	OperatorUnaryMinus:         "OperatorUnaryMinus",
+	OperatorXor:                "OperatorXor",
 	// go/keep-sorted end
 }

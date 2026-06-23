@@ -88,6 +88,8 @@ func IsUnaryOperator(m *pb.CombinationNode) bool {
 		switch m.GetListOperator() {
 		case pb.CombinationNode_LENGTH:
 			return true
+		case pb.CombinationNode_SUBSCRIPT:
+			return false
 		}
 	case pb.CombinationNode_LogicalOperator_case:
 		switch m.GetLogicalOperator() {

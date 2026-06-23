@@ -276,6 +276,26 @@ func (er *ExpressionResolver) resolveListExpressions(expNode *pb.CombinationNode
 		fieldDesc.Type = descriptorpb.FieldDescriptorProto_TYPE_INT64.Enum()
 		return fieldDesc, nil
 
+	case pb.CombinationNode_SUBSCRIPT:
+		leftFieldDesc, err := er.Resolve(expNode.GetLeftIndex())
+		if err != nil {
+			return nil, err
+		}
+		if leftFieldDesc.GetLabel() != descriptorpb.FieldDescriptorProto_LABEL_REPEATED {
+			return nil, fmt.Errorf("subscript operator can only be applied to repeated fields, got %v", leftFieldDesc.GetLabel())
+		}
+		rightFieldDesc, err := er.Resolve(expNode.GetRightIndex())
+		if err != nil {
+			return nil, err
+		}
+		if !isInt(rightFieldDesc.Type) {
+			return nil, fmt.Errorf("subscript index must be an integer, got %v", rightFieldDesc.Type)
+		}
+		fieldDesc.Type = leftFieldDesc.Type
+		fieldDesc.TypeName = leftFieldDesc.TypeName
+		fieldDesc.Label = nil
+		return fieldDesc, nil
+
 	default:
 		return nil, fmt.Errorf("Unknown ListOperator %q", op)
 	}

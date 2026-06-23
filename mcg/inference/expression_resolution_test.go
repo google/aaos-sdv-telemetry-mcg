@@ -672,6 +672,12 @@ func TestResolveListExpressions(t *testing.T) {
 						Type:  descriptorpb.FieldDescriptorProto_TYPE_INT32.Enum(),
 						Label: descriptorpb.FieldDescriptorProto_LABEL_OPTIONAL.Enum(),
 					},
+					{
+						Name:     proto.String("repeated_msg"),
+						Type:     descriptorpb.FieldDescriptorProto_TYPE_MESSAGE.Enum(),
+						TypeName: proto.String(".pkg.NestedMessage"),
+						Label:    descriptorpb.FieldDescriptorProto_LABEL_REPEATED.Enum(),
+					},
 				},
 			}
 		}
@@ -691,6 +697,14 @@ func TestResolveListExpressions(t *testing.T) {
 			pb.Node_builder{FieldLeafNode: pb.FieldLeafNode_builder{SourceName: "my_source", FieldNames: []string{"repeated_int"}}.Build()}.Build(),
 			// Index 1: singular_int
 			pb.Node_builder{FieldLeafNode: pb.FieldLeafNode_builder{SourceName: "my_source", FieldNames: []string{"singular_int"}}.Build()}.Build(),
+			// Index 2: 0 (int32)
+			pb.Node_builder{ConstantLeafNode: pb.ConstantLeafNode_builder{Int32Value: proto.Int32(0)}.Build()}.Build(),
+			// Index 3: -1 (int32)
+			pb.Node_builder{ConstantLeafNode: pb.ConstantLeafNode_builder{Int32Value: proto.Int32(-1)}.Build()}.Build(),
+			// Index 4: 1.5 (double)
+			pb.Node_builder{ConstantLeafNode: pb.ConstantLeafNode_builder{DoubleValue: proto.Float64(1.5)}.Build()}.Build(),
+			// Index 5: repeated_msg
+			pb.Node_builder{FieldLeafNode: pb.FieldLeafNode_builder{SourceName: "my_source", FieldNames: []string{"repeated_msg"}}.Build()}.Build(),
 		},
 	}.Build()
 
@@ -715,6 +729,61 @@ func TestResolveListExpressions(t *testing.T) {
 			node: pb.CombinationNode_builder{
 				ListOperator: pb.CombinationNode_LENGTH.Enum(),
 				LeftIndex:    proto.Uint32(1),
+			}.Build(),
+			wantErr: true,
+		},
+		{
+			name: "repeated_int[0] -> INT32 (singular)",
+			node: pb.CombinationNode_builder{
+				ListOperator: pb.CombinationNode_SUBSCRIPT.Enum(),
+				LeftIndex:    proto.Uint32(0),
+				RightIndex:   proto.Uint32(2),
+			}.Build(),
+			wantDesc: &descriptorpb.FieldDescriptorProto{
+				Type:  descriptorpb.FieldDescriptorProto_TYPE_INT32.Enum(),
+				Label: nil,
+			},
+		},
+		{
+			name: "repeated_int[-1] -> INT32 (singular)",
+			node: pb.CombinationNode_builder{
+				ListOperator: pb.CombinationNode_SUBSCRIPT.Enum(),
+				LeftIndex:    proto.Uint32(0),
+				RightIndex:   proto.Uint32(3),
+			}.Build(),
+			wantDesc: &descriptorpb.FieldDescriptorProto{
+				Type:  descriptorpb.FieldDescriptorProto_TYPE_INT32.Enum(),
+				Label: nil,
+			},
+		},
+		{
+			name: "repeated_msg[0] -> MESSAGE (singular)",
+			node: pb.CombinationNode_builder{
+				ListOperator: pb.CombinationNode_SUBSCRIPT.Enum(),
+				LeftIndex:    proto.Uint32(5),
+				RightIndex:   proto.Uint32(2),
+			}.Build(),
+			wantDesc: &descriptorpb.FieldDescriptorProto{
+				Type:     descriptorpb.FieldDescriptorProto_TYPE_MESSAGE.Enum(),
+				TypeName: proto.String(".pkg.NestedMessage"),
+				Label:    nil,
+			},
+		},
+		{
+			name: "repeated_int[1.5] -> error (invalid index type)",
+			node: pb.CombinationNode_builder{
+				ListOperator: pb.CombinationNode_SUBSCRIPT.Enum(),
+				LeftIndex:    proto.Uint32(0),
+				RightIndex:   proto.Uint32(4),
+			}.Build(),
+			wantErr: true,
+		},
+		{
+			name: "singular_int[0] -> error (not repeated)",
+			node: pb.CombinationNode_builder{
+				ListOperator: pb.CombinationNode_SUBSCRIPT.Enum(),
+				LeftIndex:    proto.Uint32(1),
+				RightIndex:   proto.Uint32(2),
 			}.Build(),
 			wantErr: true,
 		},
