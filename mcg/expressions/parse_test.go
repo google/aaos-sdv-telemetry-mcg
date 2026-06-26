@@ -1219,9 +1219,14 @@ func TestShuntParseEdgeCases(t *testing.T) {
 			expectError: "FAILED_PRECONDITION: Failed to parse expression \"source[]\": Missing operand(s) for binary operator: OperatorSubscript",
 		},
 		{
-			name:        "name_tbd",
+			name:        "op_subscript_after_binary_op",
 			expression:  "true&&[5]",
 			expectError: "FAILED_PRECONDITION: Failed to parse expression \"true&&[5]\": Missing operand(s) for binary operator: OperatorAnd",
+		},
+		{
+			name:        "nested_arrays_not_supported",
+			expression:  "source[0].x[1].y",
+			expectError: "FAILED_PRECONDITION: Failed to parse expression \"source[0].x[1].y\": Found operand(s) but no operator",
 		},
 	}
 
