@@ -954,6 +954,87 @@ func TestShuntParseSingleExpressionSuccess(t *testing.T) {
 				}.Build(),
 			},
 		},
+		{
+			name:       "test_field_access_after_expression",
+			expression: "(a + b).foo.bar",
+			expectRoot: 3,
+			expect: []*pb.Node{
+				pb.Node_builder{
+					FieldLeafNode: pb.FieldLeafNode_builder{
+						SourceName: "a",
+					}.Build(),
+				}.Build(),
+				pb.Node_builder{
+					FieldLeafNode: pb.FieldLeafNode_builder{
+						SourceName: "b",
+					}.Build(),
+				}.Build(),
+				pb.Node_builder{
+					CombinationNode: pb.CombinationNode_builder{
+						LeftIndex:          proto.Uint32(0),
+						RightIndex:         proto.Uint32(1),
+						ArithmeticOperator: pb.CombinationNode_ADD.Enum(),
+					}.Build(),
+				}.Build(),
+				pb.Node_builder{
+					FieldLeafNode: pb.FieldLeafNode_builder{
+						SourceName:          "",
+						FieldNames:          []string{"foo", "bar"},
+						ExpressionNodeIndex: proto.Uint32(2),
+					}.Build(),
+				}.Build(),
+			},
+		},
+		{
+			name:       "nested_arrays_supported",
+			expression: "source[0].x[1].y",
+			expectRoot: 6,
+			expect: []*pb.Node{
+				pb.Node_builder{
+					FieldLeafNode: pb.FieldLeafNode_builder{
+						SourceName: "source",
+					}.Build(),
+				}.Build(),
+				pb.Node_builder{
+					ConstantLeafNode: pb.ConstantLeafNode_builder{
+						Int32Value: proto.Int32(0),
+					}.Build(),
+				}.Build(),
+				pb.Node_builder{
+					CombinationNode: pb.CombinationNode_builder{
+						LeftIndex:    proto.Uint32(0),
+						RightIndex:   proto.Uint32(1),
+						ListOperator: pb.CombinationNode_SUBSCRIPT.Enum(),
+					}.Build(),
+				}.Build(),
+				pb.Node_builder{
+					FieldLeafNode: pb.FieldLeafNode_builder{
+						SourceName:          "",
+						FieldNames:          []string{"x"},
+						ExpressionNodeIndex: proto.Uint32(2),
+					}.Build(),
+				}.Build(),
+				pb.Node_builder{
+					ConstantLeafNode: pb.ConstantLeafNode_builder{
+						Int32Value: proto.Int32(1),
+					}.Build(),
+				}.Build(),
+				pb.Node_builder{
+					CombinationNode: pb.CombinationNode_builder{
+						LeftIndex:    proto.Uint32(3),
+						RightIndex:   proto.Uint32(4),
+						ListOperator: pb.CombinationNode_SUBSCRIPT.Enum(),
+					}.Build(),
+				}.Build(),
+				pb.Node_builder{
+					FieldLeafNode: pb.FieldLeafNode_builder{
+						SourceName:          "",
+						FieldNames:          []string{"y"},
+						ExpressionNodeIndex: proto.Uint32(5),
+					}.Build(),
+				}.Build(),
+			},
+		},
 	}
 
 	for _, tc := range cases {
@@ -973,7 +1054,7 @@ func TestShuntParseSingleExpressionSuccess(t *testing.T) {
 			if len(tc.expect) != len(nodes) {
 				t.Errorf("wrong node count, expected %d got %d", len(tc.expect), len(nodes))
 			}
-			for i := 1; i < len(tc.expect); i++ {
+			for i := 0; i < len(tc.expect); i++ {
 				got, want := nodes[i], tc.expect[i]
 				if diff := cmp.Diff(want, got, protocmp.Transform()); diff != "" {
 					t.Errorf("[%d] wrong node contents, difference (-want +got):\n%s", i, diff)
@@ -1224,9 +1305,9 @@ func TestShuntParseEdgeCases(t *testing.T) {
 			expectError: "FAILED_PRECONDITION: Failed to parse expression \"true&&[5]\": Missing operand(s) for binary operator: OperatorAnd",
 		},
 		{
-			name:        "nested_arrays_not_supported",
-			expression:  "source[0].x[1].y",
-			expectError: "FAILED_PRECONDITION: Failed to parse expression \"source[0].x[1].y\": Found operand(s) but no operator",
+			name:        "postfix_field_access_without_expression",
+			expression:  ".foo.bar.baz",
+			expectError: "FAILED_PRECONDITION: Failed to parse expression \".foo.bar.baz\": postfix field access must follow an expression",
 		},
 	}
 

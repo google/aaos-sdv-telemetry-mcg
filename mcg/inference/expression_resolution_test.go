@@ -803,3 +803,160 @@ func TestResolveListExpressions(t *testing.T) {
 		})
 	}
 }
+
+func TestResolveFieldLeafNodeWithExpressionIndex(t *testing.T) {
+	mockGetDescriptorProto := func(name protoreflect.FullName) *descriptorpb.DescriptorProto {
+		if name == "pkg.Message" {
+			return &descriptorpb.DescriptorProto{
+				Name: proto.String("Message"),
+				Field: []*descriptorpb.FieldDescriptorProto{
+					{
+						Name:     proto.String("msg_field"),
+						Type:     descriptorpb.FieldDescriptorProto_TYPE_MESSAGE.Enum(),
+						TypeName: proto.String(".pkg.NestedMessage"),
+					},
+					{
+						Name: proto.String("int_field"),
+						Type: descriptorpb.FieldDescriptorProto_TYPE_INT32.Enum(),
+					},
+					{
+						Name:     proto.String("repeated_msg_field"),
+						Type:     descriptorpb.FieldDescriptorProto_TYPE_MESSAGE.Enum(),
+						TypeName: proto.String(".pkg.NestedMessage"),
+						Label:    descriptorpb.FieldDescriptorProto_LABEL_REPEATED.Enum(),
+					},
+				},
+			}
+		}
+		if name == "pkg.NestedMessage" {
+			return &descriptorpb.DescriptorProto{
+				Name: proto.String("NestedMessage"),
+				Field: []*descriptorpb.FieldDescriptorProto{
+					{
+						Name: proto.String("nested_int"),
+						Type: descriptorpb.FieldDescriptorProto_TYPE_INT32.Enum(),
+					},
+				},
+			}
+		}
+		return nil
+	}
+
+	mockGetSourceMessageName := func(sourceName string) (protoreflect.FullName, error) {
+		if sourceName == "my_data_source" {
+			return protoreflect.FullName("pkg.Message"), nil
+		}
+		return "", fmt.Errorf("unknown source: %s", sourceName)
+	}
+
+	er := NewExpressionResolver(
+		[]*pb.Node{
+			// Index 0: Base FieldLeafNode (yields pkg.Message)
+			pb.Node_builder{
+				FieldLeafNode: pb.FieldLeafNode_builder{
+					SourceName: "my_data_source",
+				}.Build(),
+			}.Build(),
+			// Index 1: Postfix FieldLeafNode pointing to Index 0, accessing msg_field.nested_int
+			pb.Node_builder{
+				FieldLeafNode: pb.FieldLeafNode_builder{
+					ExpressionNodeIndex: proto.Uint32(0),
+					FieldNames:          []string{"msg_field", "nested_int"},
+				}.Build(),
+			}.Build(),
+			// Index 2: Postfix FieldLeafNode pointing to Index 0, accessing int_field (non-message)
+			pb.Node_builder{
+				FieldLeafNode: pb.FieldLeafNode_builder{
+					ExpressionNodeIndex: proto.Uint32(0),
+					FieldNames:          []string{"int_field"},
+				}.Build(),
+			}.Build(),
+			// Index 3: Invalid Postfix FieldLeafNode pointing to Index 2 (which is INT32, not MESSAGE)
+			pb.Node_builder{
+				FieldLeafNode: pb.FieldLeafNode_builder{
+					ExpressionNodeIndex: proto.Uint32(2),
+					FieldNames:          []string{"some_field"},
+				}.Build(),
+			}.Build(),
+			// Index 4: Postfix FieldLeafNode pointing to Index 0, accessing repeated_msg_field
+			pb.Node_builder{
+				FieldLeafNode: pb.FieldLeafNode_builder{
+					ExpressionNodeIndex: proto.Uint32(0),
+					FieldNames:          []string{"repeated_msg_field"},
+				}.Build(),
+			}.Build(),
+			// Index 5: Invalid Postfix FieldLeafNode pointing to Index 4 (which is REPEATED MESSAGE)
+			pb.Node_builder{
+				FieldLeafNode: pb.FieldLeafNode_builder{
+					ExpressionNodeIndex: proto.Uint32(4),
+					FieldNames:          []string{"nested_int"},
+				}.Build(),
+			}.Build(),
+			// Index 6: Invalid: Both source_name and expression_node_index set
+			pb.Node_builder{
+				FieldLeafNode: pb.FieldLeafNode_builder{
+					SourceName:          "my_data_source",
+					ExpressionNodeIndex: proto.Uint32(0),
+				}.Build(),
+			}.Build(),
+			// Index 7: Invalid: Neither set
+			pb.Node_builder{
+				FieldLeafNode: pb.FieldLeafNode_builder{}.Build(),
+			}.Build(),
+		},
+		mockGetSourceMessageName,
+		mockGetDescriptorProto,
+	)
+
+	tests := []struct {
+		name    string
+		nodeIdx uint32
+		want    *descriptorpb.FieldDescriptorProto
+		wantErr bool
+	}{
+		{
+			name:    "valid postfix access",
+			nodeIdx: 1,
+			want:    &descriptorpb.FieldDescriptorProto{Type: descriptorpb.FieldDescriptorProto_TYPE_INT32.Enum()},
+		},
+		{
+			name:    "valid postfix access yielding int32",
+			nodeIdx: 2,
+			want:    &descriptorpb.FieldDescriptorProto{Type: descriptorpb.FieldDescriptorProto_TYPE_INT32.Enum()},
+		},
+		{
+			name:    "error: pointing to non-message node",
+			nodeIdx: 3,
+			wantErr: true,
+		},
+		{
+			name:    "error: pointing to repeated message node",
+			nodeIdx: 5,
+			wantErr: true,
+		},
+		{
+			name:    "error: both source and expression index set",
+			nodeIdx: 6,
+			wantErr: true,
+		},
+		{
+			name:    "error: neither source nor expression index set",
+			nodeIdx: 7,
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			desc, err := er.Resolve(tt.nodeIdx)
+			if (err != nil) != tt.wantErr {
+				t.Fatalf("Resolve() got error %v, wantErr %v", err, tt.wantErr)
+			}
+			if !tt.wantErr {
+				if diff := cmp.Diff(tt.want, desc, protocmp.Transform()); diff != "" {
+					t.Errorf("Resolve() returned unexpected descriptor diff (-want +got):\n%s", diff)
+				}
+			}
+		})
+	}
+}

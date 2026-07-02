@@ -127,15 +127,42 @@ func isNumeric(nodeType *descriptorpb.FieldDescriptorProto_Type) bool {
 }
 
 func (er *ExpressionResolver) resolveFieldLeafNode(expNode *pb.FieldLeafNode) (*descriptorpb.FieldDescriptorProto, error) {
-	sourceName := expNode.GetSourceName()
-	fieldNames := expNode.GetFieldNames()
-
-	msgFullName, err := er.getSourceMessageName(sourceName)
+	msgFullName, err := er.resolveMessageName(expNode)
 	if err != nil {
 		return nil, err
 	}
+	return er.resolveFieldPath(msgFullName, expNode.GetFieldNames())
+}
 
-	return er.resolveFieldPath(msgFullName, fieldNames)
+func (er *ExpressionResolver) resolveMessageName(expNode *pb.FieldLeafNode) (protoreflect.FullName, error) {
+	hasSource := expNode.GetSourceName() != ""
+	hasExpr := expNode.HasExpressionNodeIndex()
+
+	if hasSource && hasExpr {
+		return "", fmt.Errorf("field leaf node cannot have both source_name and expression_node_index set")
+	}
+	if !hasSource && !hasExpr {
+		return "", fmt.Errorf("field leaf node must have either source_name or expression_node_index set")
+	}
+
+	if hasExpr {
+		exprIdx := expNode.GetExpressionNodeIndex()
+		targetDesc, err := er.Resolve(exprIdx)
+		if err != nil {
+			return "", err
+		}
+		if targetDesc.GetType() != descriptorpb.FieldDescriptorProto_TYPE_MESSAGE {
+			return "", fmt.Errorf("expression at index %d does not yield a message type, got %s", exprIdx, targetDesc.GetType().String())
+		}
+		if targetDesc.GetLabel() == descriptorpb.FieldDescriptorProto_LABEL_REPEATED {
+			return "", fmt.Errorf("cannot access fields on a repeated message type at index %d", exprIdx)
+		}
+		return protoreflect.FullName(strings.TrimPrefix(targetDesc.GetTypeName(), ".")), nil
+	}
+
+	// must have source
+	sourceName := expNode.GetSourceName()
+	return er.getSourceMessageName(sourceName)
 }
 
 func (er *ExpressionResolver) resolveFieldPath(msgFullName protoreflect.FullName, fieldNames []string) (*descriptorpb.FieldDescriptorProto, error) {

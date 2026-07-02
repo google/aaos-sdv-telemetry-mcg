@@ -340,10 +340,24 @@ func (v *McValidator) validateExpressionNodes() {
 			v.ErrorList = append(v.ErrorList, errs...)
 		}
 
-		// Field leaf nodes should only refer to existing sources.
+		// Field leaf nodes should only refer to existing sources or valid expression nodes.
 		if fieldLeafNode := node.GetFieldLeafNode(); fieldLeafNode != nil {
-			if v.sourcesMap[fieldLeafNode.GetSourceName()] == nil {
-				v.ErrorList = append(v.ErrorList, mcgerrors.ExpressionNodeWithInvalidSourceReference(i, fieldLeafNode.GetSourceName()))
+			hasSource := fieldLeafNode.GetSourceName() != ""
+			hasExpr := fieldLeafNode.HasExpressionNodeIndex()
+
+			if hasSource && hasExpr {
+				v.ErrorList = append(v.ErrorList, mcgerrors.FieldLeafNodeWithBothSourceAndExpressionIndexSet(i))
+			} else if !hasSource && !hasExpr {
+				v.ErrorList = append(v.ErrorList, mcgerrors.FieldLeafNodeWithNeitherSourceNorExpressionIndexSet(i))
+			} else if hasExpr {
+				exprIdx := fieldLeafNode.GetExpressionNodeIndex()
+				if exprIdx >= exprNodesLen {
+					v.ErrorList = append(v.ErrorList, mcgerrors.FieldLeafNodeWithInvalidExpressionNodeReference(exprIdx))
+				}
+			} else {
+				if v.sourcesMap[fieldLeafNode.GetSourceName()] == nil {
+					v.ErrorList = append(v.ErrorList, mcgerrors.ExpressionNodeWithInvalidSourceReference(i, fieldLeafNode.GetSourceName()))
+				}
 			}
 		}
 
@@ -412,6 +426,14 @@ func validateNoExpressionNodeCycles(currIdx int, visited, checkedExpressionNodes
 
 		if rightIdx := combNode.GetRightIndex(); combNode.HasRightIndex() {
 			if err := validateNoExpressionNodeCycles(int(rightIdx), visited, checkedExpressionNodes, exprNodes); err != nil {
+				return err
+			}
+		}
+	}
+
+	if fieldNode := exprNodes[currIdx].GetFieldLeafNode(); fieldNode != nil {
+		if exprIdx := fieldNode.GetExpressionNodeIndex(); fieldNode.HasExpressionNodeIndex() {
+			if err := validateNoExpressionNodeCycles(int(exprIdx), visited, checkedExpressionNodes, exprNodes); err != nil {
 				return err
 			}
 		}

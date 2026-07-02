@@ -1123,3 +1123,132 @@ func TestValidateDataTriggerWithOnDemandTypeDataSourceFails(t *testing.T) {
 		t.Fatal("Validation should not pass with data trigger using data source with ON_DEMAND connection type.")
 	}
 }
+
+func TestValidateFieldLeafNodeWithExpressionIndex(t *testing.T) {
+	dataSource := pb.Source_builder{
+		Name: "DataSourceName",
+		DataSource: pb.DataSource_builder{
+			SourceIdentifier: "SourceIdentifier",
+		}.Build(),
+	}.Build()
+
+	// Node 0: Base FieldLeafNode
+	node0 := pb.Node_builder{
+		FieldLeafNode: pb.FieldLeafNode_builder{
+			SourceName: "DataSourceName",
+			FieldNames: []string{"field_1"},
+		}.Build(),
+	}.Build()
+
+	t.Run("valid postfix validation passes", func(t *testing.T) {
+		// Node 1: Valid Postfix FieldLeafNode pointing to Node 0
+		node1 := pb.Node_builder{
+			FieldLeafNode: pb.FieldLeafNode_builder{
+				ExpressionNodeIndex: proto.Uint32(0),
+				FieldNames:          []string{"field_2"},
+			}.Build(),
+		}.Build()
+
+		v := validators.NewMcValidator(pb.MetricsConfig_builder{
+			ExpressionNodes: []*pb.Node{node0, node1},
+			Sources:         []*pb.Source{dataSource},
+		}.Build(), false)
+
+		validators.ValidateExpressionNodes(v)
+		if len(v.ErrorList) != 0 {
+			validators.PrintErrorList(v)
+			t.Fatal("Validation should pass for valid postfix FieldLeafNode")
+		}
+	})
+
+	t.Run("invalid expression index fails", func(t *testing.T) {
+		// Node 2: Invalid Postfix FieldLeafNode pointing to out-of-bounds index (3)
+		node2 := pb.Node_builder{
+			FieldLeafNode: pb.FieldLeafNode_builder{
+				ExpressionNodeIndex: proto.Uint32(3),
+				FieldNames:          []string{"field_3"},
+			}.Build(),
+		}.Build()
+
+		v := validators.NewMcValidator(pb.MetricsConfig_builder{
+			ExpressionNodes: []*pb.Node{node0, node2},
+			Sources:         []*pb.Source{dataSource},
+		}.Build(), false)
+
+		validators.ValidateExpressionNodes(v)
+		if len(v.ErrorList) != 1 || v.ErrorList[0].Status.Message != mcgerrors.FieldLeafNodeWithInvalidExpressionNodeReference(3).Status.Message {
+			validators.PrintErrorList(v)
+			t.Fatal("Validation should fail for out-of-bounds ExpressionNodeIndex")
+		}
+	})
+
+	t.Run("both source and expression index set fails", func(t *testing.T) {
+		// Node 3: Invalid: Both SourceName and ExpressionNodeIndex set
+		node3 := pb.Node_builder{
+			FieldLeafNode: pb.FieldLeafNode_builder{
+				SourceName:          "DataSourceName",
+				ExpressionNodeIndex: proto.Uint32(0),
+				FieldNames:          []string{"field_4"},
+			}.Build(),
+		}.Build()
+
+		v := validators.NewMcValidator(pb.MetricsConfig_builder{
+			ExpressionNodes: []*pb.Node{node0, node3},
+			Sources:         []*pb.Source{dataSource},
+		}.Build(), false)
+
+		validators.ValidateExpressionNodes(v)
+		if len(v.ErrorList) != 1 || v.ErrorList[0].Status.Message != mcgerrors.FieldLeafNodeWithBothSourceAndExpressionIndexSet(1).Status.Message {
+			validators.PrintErrorList(v)
+			t.Fatal("Validation should fail when both SourceName and ExpressionNodeIndex are set")
+		}
+	})
+
+	t.Run("neither source nor expression index set fails", func(t *testing.T) {
+		// Node 4: Invalid: Neither set
+		node4 := pb.Node_builder{
+			FieldLeafNode: pb.FieldLeafNode_builder{
+				FieldNames: []string{"field_5"},
+			}.Build(),
+		}.Build()
+
+		v := validators.NewMcValidator(pb.MetricsConfig_builder{
+			ExpressionNodes: []*pb.Node{node4},
+			Sources:         []*pb.Source{dataSource},
+		}.Build(), false)
+
+		validators.ValidateExpressionNodes(v)
+		if len(v.ErrorList) != 1 || v.ErrorList[0].Status.Message != mcgerrors.FieldLeafNodeWithNeitherSourceNorExpressionIndexSet(0).Status.Message {
+			validators.PrintErrorList(v)
+			t.Fatal("Validation should fail when neither SourceName nor ExpressionNodeIndex are set")
+		}
+	})
+}
+
+func TestValidateExpressionNodesWithExpressionIndexCycleFails(t *testing.T) {
+	// Node 0: FieldLeafNode pointing to Node 1
+	node0 := pb.Node_builder{
+		FieldLeafNode: pb.FieldLeafNode_builder{
+			ExpressionNodeIndex: proto.Uint32(1),
+			FieldNames:          []string{"field_1"},
+		}.Build(),
+	}.Build()
+
+	// Node 1: CombinationNode pointing to Node 0 (Unary)
+	node1 := pb.Node_builder{
+		CombinationNode: pb.CombinationNode_builder{
+			LeftIndex:        proto.Uint32(0),
+			RoundingOperator: pb.CombinationNode_FLOOR.Enum(),
+		}.Build(),
+	}.Build()
+
+	v := validators.NewMcValidator(pb.MetricsConfig_builder{
+		ExpressionNodes: []*pb.Node{node0, node1},
+	}.Build(), false)
+
+	validators.ValidateExpressionNodes(v)
+	if len(v.ErrorList) != 1 || v.ErrorList[0].Status.Message != mcgerrors.CyclicDependency("expression_nodes[0]").Status.Message {
+		validators.PrintErrorList(v)
+		t.Fatal("Validation should fail if there is a cycle involving expression_node_index")
+	}
+}

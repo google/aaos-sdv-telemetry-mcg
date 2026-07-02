@@ -114,26 +114,37 @@ func (p *ParserShunt) compileOne(source string) (uint32, error) {
 
 	operandStack := make([]operand, 0, 8)
 	operatorStack := make([]Operator, 0, 8)
-	for _, tok := range tokens {
+	for i, tok := range tokens {
 		switch ttok := tok.(type) {
 		case []string:
-			if len(ttok) == 1 {
-				pub := ttok[0]
-				p.pushNodeToOperandStack(pb.Node_builder{
-					FieldLeafNode: pb.FieldLeafNode_builder{
-						SourceName: pub,
-					}.Build(),
-				}.Build(), &operandStack, false)
-			} else {
-				pub := ttok[0]
-				fields := ttok[1:]
-				p.pushNodeToOperandStack(pb.Node_builder{
-					FieldLeafNode: pb.FieldLeafNode_builder{
-						SourceName: pub,
-						FieldNames: fields,
-					}.Build(),
-				}.Build(), &operandStack, false)
+			if len(ttok) == 0 {
+				break
 			}
+			pub, fields := ttok[0], ttok[1:]
+			fieldLeafNodeBuilder := pb.FieldLeafNode_builder{
+				SourceName: pub,
+				FieldNames: fields,
+			}
+			if pub == "" {
+				if i == 0 {
+					return 0, mcgerrors.InvalidExpressionError(source, fmt.Errorf("postfix field access must follow an expression"))
+				}
+				if isOperand(tokens[i-1]) {
+					// Postfix field access acts as an operator with the same precedence as Subscript.
+					// We must collapse the operator stack for any operators with higher or equal precedence.
+					if err := p.collapseOperators(precedence[OperatorSubscript], &operandStack, &operatorStack); err != nil {
+						return 0, mcgerrors.InvalidExpressionError(source, err)
+					}
+
+					if len(operandStack) == 0 {
+						return 0, mcgerrors.InvalidExpressionError(source, fmt.Errorf("empty operand stack for postfix field access"))
+					}
+					lhs := operandStack[len(operandStack)-1]
+					operandStack = operandStack[:len(operandStack)-1]
+					fieldLeafNodeBuilder.ExpressionNodeIndex = proto.Uint32(lhs.index)
+				}
+			}
+			p.pushNodeToOperandStack(pb.Node_builder{FieldLeafNode: fieldLeafNodeBuilder.Build()}.Build(), &operandStack, false)
 		case bool:
 			p.pushNodeToOperandStack(pb.Node_builder{
 				ConstantLeafNode: pb.ConstantLeafNode_builder{
@@ -177,18 +188,8 @@ func (p *ParserShunt) compileOne(source string) (uint32, error) {
 					return 0, mcgerrors.InvalidExpressionError(source, err)
 				}
 			case OperatorLeftSquareBracket:
-				ttokSub := OperatorSubscript
-				for len(operatorStack) >= 1 {
-					lastOp := operatorStack[len(operatorStack)-1]
-					if precedence[lastOp] < precedence[ttokSub] {
-						break
-					}
-					operatorStack = operatorStack[:len(operatorStack)-1]
-					n, err := p.buildCombinationNode(lastOp, &operandStack)
-					if err != nil {
-						return 0, mcgerrors.InvalidExpressionError(source, err)
-					}
-					p.pushNodeToOperandStack(n, &operandStack, isComparisonOperator(lastOp))
+				if err := p.collapseOperators(precedence[OperatorSubscript], &operandStack, &operatorStack); err != nil {
+					return 0, mcgerrors.InvalidExpressionError(source, err)
 				}
 				operatorStack = append(operatorStack, OperatorSubscript)
 				operatorStack = append(operatorStack, OperatorLeftSquareBracket)
@@ -197,17 +198,8 @@ func (p *ParserShunt) compileOne(source string) (uint32, error) {
 					return 0, mcgerrors.InvalidExpressionError(source, err)
 				}
 			default:
-				for len(operatorStack) >= 1 {
-					lastOp := operatorStack[len(operatorStack)-1]
-					if precedence[lastOp] < precedence[ttok] {
-						break
-					}
-					operatorStack = operatorStack[:len(operatorStack)-1]
-					n, err := p.buildCombinationNode(lastOp, &operandStack)
-					if err != nil {
-						return 0, mcgerrors.InvalidExpressionError(source, err)
-					}
-					p.pushNodeToOperandStack(n, &operandStack, isComparisonOperator(lastOp))
+				if err := p.collapseOperators(precedence[ttok], &operandStack, &operatorStack); err != nil {
+					return 0, mcgerrors.InvalidExpressionError(source, err)
 				}
 				operatorStack = append(operatorStack, ttok)
 			}
@@ -266,6 +258,32 @@ func isComparisonOperator(op Operator) bool {
 	default:
 		return false
 	}
+}
+
+func isOperand(tok token) bool {
+	switch t := tok.(type) {
+	case bool, int32, int64, float32, float64, []string, *pb.Node:
+		return true
+	case Operator:
+		return t == OperatorRightParen || t == OperatorRightSquareBracket
+	}
+	return false
+}
+
+func (p *ParserShunt) collapseOperators(targetPrecedence int8, operandStack *[]operand, operatorStack *[]Operator) error {
+	for len(*operatorStack) >= 1 {
+		lastOp := (*operatorStack)[len(*operatorStack)-1]
+		if precedence[lastOp] < targetPrecedence {
+			break
+		}
+		*operatorStack = (*operatorStack)[:len(*operatorStack)-1]
+		n, err := p.buildCombinationNode(lastOp, operandStack)
+		if err != nil {
+			return err
+		}
+		p.pushNodeToOperandStack(n, operandStack, isComparisonOperator(lastOp))
+	}
+	return nil
 }
 
 // Processes the stack when token ')' is encountered. Builds nodes until a

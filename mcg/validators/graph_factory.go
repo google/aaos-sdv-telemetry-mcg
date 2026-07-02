@@ -77,7 +77,11 @@ func NewGraphForInferenceCycleChecks(mc *pb.MetricsConfig) *graph.Graph[string] 
 						case pb.Node_FieldLeafNode_case:
 							fn := node.GetFieldLeafNode()
 
-							g.AddEdge(pub.GetName(), fn.GetSourceName())
+							if fn.HasExpressionNodeIndex() {
+								queue = append(queue, fn.GetExpressionNodeIndex())
+							} else {
+								g.AddEdge(pub.GetName(), fn.GetSourceName())
+							}
 						case pb.Node_CombinationNode_case:
 							cn := node.GetCombinationNode()
 

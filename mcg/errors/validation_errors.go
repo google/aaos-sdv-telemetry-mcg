@@ -137,6 +137,15 @@ var (
 	ExpressionNodeWithInvalidSourceReference = func(expressionNodeIdx int, sourceName string) *StatusError {
 		return InvalidArgument("An expression node refers to a non-existent source").WithFieldViolation(fmt.Sprintf("expression_nodes[%d].SourceName:%s", expressionNodeIdx, sourceName), FIELD_INVALID)
 	}
+	FieldLeafNodeWithInvalidExpressionNodeReference = func(expressionNodeIdx uint32) *StatusError {
+		return InvalidArgument("A field leaf node refers to a non-existent expression node").WithFieldViolation(fmt.Sprintf("expression_nodes[%d]", expressionNodeIdx), FIELD_INVALID)
+	}
+	FieldLeafNodeWithBothSourceAndExpressionIndexSet = func(idx int) *StatusError {
+		return InvalidArgument("A field leaf node cannot have both source_name and expression_node_index set").WithFieldViolation(fmt.Sprintf("expression_nodes[%d]", idx), FIELD_INVALID)
+	}
+	FieldLeafNodeWithNeitherSourceNorExpressionIndexSet = func(idx int) *StatusError {
+		return InvalidArgument("A field leaf node must have either source_name or expression_node_index set").WithFieldViolation(fmt.Sprintf("expression_nodes[%d]", idx), FIELD_MISSING)
+	}
 	UnknownMessageType = func(msgType string) *StatusError {
 		return InvalidArgument("Message type doesn't match with a known type").WithFieldViolation(msgType, FIELD_MISSING)
 	}
