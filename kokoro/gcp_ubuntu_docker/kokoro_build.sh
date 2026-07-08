@@ -63,6 +63,19 @@ useradd -m -s /bin/bash bazeluser
 chmod -R a+rw "${MCG_REPO}"
 chmod -R a+rw "${XDG_CACHE_HOME}"
 
+# Grant Bazel tests access to the Docker daemon. The docker daemon acts as a proxy
+# to the host's daemon to enable docker-in-docker (DinD). We use the numeric group ID
+# (GID) of the mounted socket because the named 'docker' group might not exist inside
+# this container image or map to the correct GID from the host.
+if [ -e /var/run/docker.sock ]; then
+  DOCKER_GID=$(stat -c '%g' /var/run/docker.sock)
+  if ! getent group "$DOCKER_GID" > /dev/null 2>&1; then
+    groupadd -g "$DOCKER_GID" docker_host
+  fi
+  DOCKER_GROUP=$(getent group "$DOCKER_GID" | cut -d: -f1)
+  usermod -aG "$DOCKER_GROUP" bazeluser
+fi
+
 FAILURE=0
 # Helper function that runs the provided command, and sets `FAILURE` to 1 if the
 # command exits with a non-zero exit code. This allows us to continue running
@@ -83,7 +96,7 @@ run_test() {
     fi
 }
 
-run_test runuser -u bazeluser -- bazel test --test_output=all //...
+run_test runuser -u bazeluser -- bazel test --test_env=KOKORO=1 --test_output=all //...
 
 run_test runuser -u bazeluser -- bazel run //tools:buildifier -- -lint fix -r .
 run_test runuser -u bazeluser -- bazel run //tools:go -- run cmd/gofmt -l -w **/*.go

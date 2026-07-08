@@ -35,7 +35,15 @@ trap kill_container EXIT
 ip_address="$(docker inspect -f '{{range.NetworkSettings.Networks}}{{.IPAddress}}{{end}}' "$container_id")"
 addr="http://$ip_address:8005"
 
-curl -sSf "$addr"/health
+# Wait for the server to be ready
+echo "Waiting for server to become ready..."
+for _ in {1..30}; do
+    if curl -sSf "$addr"/health > /dev/null; then
+        echo "Server is ready!"
+        break
+    fi
+    sleep 1
+done
 
 curl -sSf -o /tmp/mcg_smoke_test_v1.pb -X POST "$addr/api/v1/generate_metrics_config" -H 'content-type:application/json' -d '{"triggers":[{"name": "p", "periodic": {"period_ms": 1}}],"start_trigger_name":"p"}'
 protoc --decode_raw < /tmp/mcg_smoke_test_v1.pb

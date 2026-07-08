@@ -76,7 +76,7 @@ func TestRedisCacheCluster(t *testing.T) {
 		EnableRedCache:   true,
 		IsRedisCluster:   true,
 		RedClusterOpts: redis.ClusterOptions{
-			Addrs: []string{net.JoinHostPort("127.0.0.1", resource.GetPort("7000/tcp"))},
+			Addrs: []string{getContainerAddr(resource, "7000")},
 		},
 	}
 	cache, closeCache, err := vs_cache.NewCache(ctx, config)
@@ -116,7 +116,7 @@ func TestRedisCacheStandalone(t *testing.T) {
 		EnableRedCache:   true,
 		IsRedisCluster:   false,
 		RedOpts: redis.Options{
-			Addr: net.JoinHostPort("127.0.0.1", resource.GetPort("6379/tcp")),
+			Addr: getContainerAddr(resource, "6379"),
 		},
 	}
 	cache, closeCache, err := vs_cache.NewCache(ctx, config)
@@ -189,6 +189,29 @@ func waitForContainerHealthy(ctx context.Context, t *testing.T, pool *dockertest
 		t.Fatalf("Failed to wait for container to become healthy: %v", err)
 	}
 	t.Log("Container is healthy")
+}
+
+func getContainerIP(resource *dockertest.Resource) string {
+	if ip := resource.Container.NetworkSettings.IPAddress; ip != "" {
+		return ip
+	}
+	for _, network := range resource.Container.NetworkSettings.Networks {
+		if network.IPAddress != "" {
+			return network.IPAddress
+		}
+	}
+	return "127.0.0.1"
+}
+
+func getContainerAddr(resource *dockertest.Resource, internalPort string) string {
+	if os.Getenv("KOKORO") != "" {
+		// Inside Kokoro GCP_UBUNTU_DOCKER, tests run in a Docker-in-Docker builder container.
+		// Sibling container port bindings to 127.0.0.1 map to the host, not the builder container.
+		// We must connect directly to the container's internal bridge IP.
+		return net.JoinHostPort(getContainerIP(resource), internalPort)
+	}
+	// For local development on Linux and MacOS, connect via the mapped localhost port.
+	return net.JoinHostPort("127.0.0.1", resource.GetPort(internalPort+"/tcp"))
 }
 
 func setupDockerRedisCluster(dockerfilePath string) (*dockertest.Pool, *dockertest.Resource, error) {

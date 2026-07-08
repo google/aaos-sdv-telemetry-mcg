@@ -55,7 +55,10 @@ go_test(
     data = [
         "//mcg/testdata:exported_testdata",
     ],
-    tags = ["manual"],
+    tags = [
+        "no-sandbox",
+        "requires-network",
+    ],
     deps = [
         ":vs_cache",
         "//mcg/testhelper",

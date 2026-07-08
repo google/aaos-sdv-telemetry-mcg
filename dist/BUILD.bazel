@@ -57,10 +57,7 @@ sh_test(
     data = [
         ":image_mcg_tarball",
     ],
-    tags = [
-        "manual",
-        "no-sandbox",
-    ],
+    tags = ["no-sandbox"],
 )
 
 shellcheck_test(
