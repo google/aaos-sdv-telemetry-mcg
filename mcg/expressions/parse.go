@@ -180,6 +180,14 @@ func (p *ParserShunt) compileOne(source string) (uint32, error) {
 		case Operator:
 			switch ttok {
 			case OperatorAllEq, OperatorContains, OperatorDoesNotContain, OperatorFloor, OperatorRound, OperatorCeil, OperatorAbsolute, OperatorUnaryMinus, OperatorLength:
+				if ttok != OperatorUnaryMinus {
+					if i+1 >= len(tokens) {
+						return 0, mcgerrors.InvalidExpressionError(source, fmt.Errorf("Missing operand for unary operator: %v", ttok))
+					}
+					if nextOp, ok := tokens[i+1].(Operator); !ok || nextOp != OperatorLeftParen {
+						return 0, mcgerrors.InvalidExpressionError(source, fmt.Errorf("%v requires parentheses", ttok))
+					}
+				}
 				operatorStack = append(operatorStack, ttok)
 			case OperatorLeftParen:
 				operatorStack = append(operatorStack, ttok)

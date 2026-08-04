@@ -1309,6 +1309,46 @@ func TestShuntParseEdgeCases(t *testing.T) {
 			expression:  ".foo.bar.baz",
 			expectError: "FAILED_PRECONDITION: Failed to parse expression \".foo.bar.baz\": postfix field access must follow an expression",
 		},
+		{
+			name:        "unparenthesized_floor_rejected",
+			expression:  "floor 4.5",
+			expectError: "FAILED_PRECONDITION: Failed to parse expression \"floor 4.5\": OperatorFloor requires parentheses",
+		},
+		{
+			name:        "unparenthesized_round_rejected",
+			expression:  "round 4.5",
+			expectError: "FAILED_PRECONDITION: Failed to parse expression \"round 4.5\": OperatorRound requires parentheses",
+		},
+		{
+			name:        "unparenthesized_ceil_rejected",
+			expression:  "ceil 4.5",
+			expectError: "FAILED_PRECONDITION: Failed to parse expression \"ceil 4.5\": OperatorCeil requires parentheses",
+		},
+		{
+			name:        "unparenthesized_abs_rejected",
+			expression:  "abs 2",
+			expectError: "FAILED_PRECONDITION: Failed to parse expression \"abs 2\": OperatorAbsolute requires parentheses",
+		},
+		{
+			name:        "unparenthesized_length_rejected",
+			expression:  "length [1, 2]",
+			expectError: "FAILED_PRECONDITION: Failed to parse expression \"length [1, 2]\": OperatorLength requires parentheses",
+		},
+		{
+			name:        "unparenthesized_contains_rejected",
+			expression:  "contains source.field 5",
+			expectError: "FAILED_PRECONDITION: Failed to parse expression \"contains source.field 5\": OperatorContains requires parentheses",
+		},
+		{
+			name:        "unparenthesized_doesnotcontain_rejected",
+			expression:  "doesnotcontain source.field 5",
+			expectError: "FAILED_PRECONDITION: Failed to parse expression \"doesnotcontain source.field 5\": OperatorDoesNotContain requires parentheses",
+		},
+		{
+			name:        "unparenthesized_alleq_rejected",
+			expression:  "alleq source.field true",
+			expectError: "FAILED_PRECONDITION: Failed to parse expression \"alleq source.field true\": OperatorAllEq requires parentheses",
+		},
 	}
 
 	for _, tc := range testCases {
