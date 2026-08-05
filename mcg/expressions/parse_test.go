@@ -1035,6 +1035,66 @@ func TestShuntParseSingleExpressionSuccess(t *testing.T) {
 				}.Build(),
 			},
 		},
+		{
+			name:       "test_floor_leading_dot",
+			expression: "floor(.5)",
+			expectRoot: 1,
+			expect: []*pb.Node{
+				pb.Node_builder{
+					ConstantLeafNode: pb.ConstantLeafNode_builder{
+						FloatValue: proto.Float32(0.5),
+					}.Build(),
+				}.Build(),
+				pb.Node_builder{
+					CombinationNode: pb.CombinationNode_builder{
+						LeftIndex:        proto.Uint32(0),
+						RoundingOperator: pb.CombinationNode_FLOOR.Enum(),
+					}.Build(),
+				}.Build(),
+			},
+		},
+		{
+			name:       "test_ceil_leading_dot",
+			expression: "ceil(.5)",
+			expectRoot: 1,
+			expect: []*pb.Node{
+				pb.Node_builder{
+					ConstantLeafNode: pb.ConstantLeafNode_builder{
+						FloatValue: proto.Float32(0.5),
+					}.Build(),
+				}.Build(),
+				pb.Node_builder{
+					CombinationNode: pb.CombinationNode_builder{
+						LeftIndex:        proto.Uint32(0),
+						RoundingOperator: pb.CombinationNode_CEIL.Enum(),
+					}.Build(),
+				}.Build(),
+			},
+		},
+		{
+			name:       "test_add_leading_dot",
+			expression: ".25 + .75",
+			expectRoot: 2,
+			expect: []*pb.Node{
+				pb.Node_builder{
+					ConstantLeafNode: pb.ConstantLeafNode_builder{
+						FloatValue: proto.Float32(0.25),
+					}.Build(),
+				}.Build(),
+				pb.Node_builder{
+					ConstantLeafNode: pb.ConstantLeafNode_builder{
+						FloatValue: proto.Float32(0.75),
+					}.Build(),
+				}.Build(),
+				pb.Node_builder{
+					CombinationNode: pb.CombinationNode_builder{
+						LeftIndex:          proto.Uint32(0),
+						RightIndex:         proto.Uint32(1),
+						ArithmeticOperator: pb.CombinationNode_ADD.Enum(),
+					}.Build(),
+				}.Build(),
+			},
+		},
 	}
 
 	for _, tc := range cases {
@@ -1103,6 +1163,11 @@ func TestShuntParseConstantLeafNodeTypes(t *testing.T) {
 		{
 			name:       "float32_exact_0_5",
 			expression: "0.5",
+			wantNode:   func(n *pb.ConstantLeafNode) bool { return n.GetFloatValue() == 0.5 },
+		},
+		{
+			name:       "float32_leading_dot_0_5",
+			expression: ".5",
 			wantNode:   func(n *pb.ConstantLeafNode) bool { return n.GetFloatValue() == 0.5 },
 		},
 		{
