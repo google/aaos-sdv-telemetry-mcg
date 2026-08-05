@@ -281,6 +281,52 @@ func equalOperators(a, b *pb.CombinationNode) bool {
 	return cmp.Equal(a, b, protocmp.Transform(), protocmp.IgnoreFields(new(pb.CombinationNode), "left_index", "right_index"))
 }
 
+func TestUnaryOperatorCombinations(t *testing.T) {
+	validCases := []string{
+		"--5",
+		"-- 5",
+		"---5",
+		"--- 5",
+		"----5",
+		"---- 5",
+		"- -5",
+		"- - 5",
+		"- - -5",
+		"- - - 5",
+		"-(-5)",
+		"!-5",
+		"! -5",
+		"!!false",
+		"!! false",
+		"! !false",
+		"! ! false",
+		"!!!!!false",
+		"-!true",
+		"- !true",
+		"! - ! - 5",
+		"!-!-5",
+		"!-! - 5",
+		"! - ! -5",
+		"- ! - ! 5",
+		"-!-!5",
+		"-abs(-5)",
+		"-floor(4.5)",
+		"!contains(my_source.val, 5)",
+		"abs(abs(-5))",
+		"floor(ceil(4.5))",
+	}
+	for _, expr := range validCases {
+		t.Run("valid_"+expr, func(t *testing.T) {
+			sess := map[uint32]expressions.Text{1: {Uncompiled: expr}}
+			p := expressions.NewParserShunt(false)
+			_, _, err := p.CompileAll(sess)
+			if err != nil {
+				t.Errorf("CompileAll(%q) failed unexpectedly: %v", expr, err)
+			}
+		})
+	}
+}
+
 func TestShuntParsePrecedence(t *testing.T) {
 	operatorInfo := []struct {
 		name            string
@@ -1338,11 +1384,6 @@ func TestShuntParseEdgeCases(t *testing.T) {
 			name:        "missing_operand_for_binary_operator",
 			expression:  "1**",
 			expectError: "FAILED_PRECONDITION: Failed to parse expression \"1**\": Missing operand(s) for binary operator: OperatorPower",
-		},
-		{
-			name:        "invalid_unary_operator",
-			expression:  "!!true",
-			expectError: "FAILED_PRECONDITION: Failed to parse expression \"!!true\": Unknown operator \"!!\"",
 		},
 		{
 			name:        "empty_function_operator",

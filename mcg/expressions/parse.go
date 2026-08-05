@@ -179,15 +179,15 @@ func (p *ParserShunt) compileOne(source string) (uint32, error) {
 			p.pushNodeToOperandStack(ttok, &operandStack, false)
 		case Operator:
 			switch ttok {
-			case OperatorAllEq, OperatorContains, OperatorDoesNotContain, OperatorFloor, OperatorRound, OperatorCeil, OperatorAbsolute, OperatorUnaryMinus, OperatorLength:
-				if ttok != OperatorUnaryMinus {
-					if i+1 >= len(tokens) {
-						return 0, mcgerrors.InvalidExpressionError(source, fmt.Errorf("Missing operand for unary operator: %v", ttok))
-					}
-					if nextOp, ok := tokens[i+1].(Operator); !ok || nextOp != OperatorLeftParen {
-						return 0, mcgerrors.InvalidExpressionError(source, fmt.Errorf("%v requires parentheses", ttok))
-					}
+			case OperatorAllEq, OperatorContains, OperatorDoesNotContain, OperatorFloor, OperatorRound, OperatorCeil, OperatorAbsolute, OperatorLength:
+				if i+1 >= len(tokens) {
+					return 0, mcgerrors.InvalidExpressionError(source, fmt.Errorf("Missing operand for unary operator: %v", ttok))
 				}
+				if nextOp, ok := tokens[i+1].(Operator); !ok || nextOp != OperatorLeftParen {
+					return 0, mcgerrors.InvalidExpressionError(source, fmt.Errorf("%v requires parentheses", ttok))
+				}
+				operatorStack = append(operatorStack, ttok)
+			case OperatorUnaryMinus, OperatorNot:
 				operatorStack = append(operatorStack, ttok)
 			case OperatorLeftParen:
 				operatorStack = append(operatorStack, ttok)
@@ -457,6 +457,14 @@ func (p *ParserShunt) tokenize(source string) ([]token, error) {
 				}
 			} else {
 				tokens = append(tokens, OperatorSubtract)
+			}
+		} else if c == '!' {
+			if strings.HasPrefix(source[i:], "!=") {
+				tokens = append(tokens, OperatorNotEq)
+				adv = 2
+			} else {
+				tokens = append(tokens, OperatorNot)
+				adv = 1
 			}
 		} else if c == '(' {
 			tokens = append(tokens, OperatorLeftParen)
@@ -744,12 +752,8 @@ func parseOperator(s string) (token, error) {
 		return OperatorOr, nil
 	case "^":
 		return OperatorXor, nil
-	case "!":
-		return OperatorNot, nil
 	case "==":
 		return OperatorEq, nil
-	case "!=":
-		return OperatorNotEq, nil
 	case ">=":
 		return OperatorGtEq, nil
 	case ">":
