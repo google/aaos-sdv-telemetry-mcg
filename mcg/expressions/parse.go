@@ -634,12 +634,15 @@ func parseValue(s string) (token, error) {
 	if err == nil {
 		return int64(i64), nil
 	}
-	f64, err := strconv.ParseFloat(s, 64)
-	if err == nil {
-		if float64(float32(f64)) == f64 {
-			return float32(f64), nil
+
+	if !strings.ContainsAny(s, "eEpP") {
+		f64, err := strconv.ParseFloat(s, 64)
+		if err == nil {
+			if float64(float32(f64)) == f64 {
+				return float32(f64), nil
+			}
+			return float64(f64), nil
 		}
-		return float64(f64), nil
 	}
 	split := strings.Split(s, ".")
 	return []string(split), nil
