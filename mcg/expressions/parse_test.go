@@ -16,6 +16,7 @@ package expressions_test
 
 import (
 	"fmt"
+	"math"
 	"strings"
 	"testing"
 	"unicode"
@@ -1688,5 +1689,60 @@ func TestShuntParseDisallowComparisonChaining_InterExpressionLeak(t *testing.T) 
 	}
 	if !strings.Contains(err.Error(), "comparison operator chaining is disallowed") {
 		t.Errorf("CompileAll(%v) expected error containing %q, got: %q", sess, "comparison operator chaining is disallowed", err.Error())
+	}
+}
+
+func TestShuntParseNumberLimits(t *testing.T) {
+	int32Leaf := func(v int32) *pb.Node {
+		return pb.Node_builder{ConstantLeafNode: pb.ConstantLeafNode_builder{Int32Value: proto.Int32(v)}.Build()}.Build()
+	}
+	int64Leaf := func(v int64) *pb.Node {
+		return pb.Node_builder{ConstantLeafNode: pb.ConstantLeafNode_builder{Int64Value: proto.Int64(v)}.Build()}.Build()
+	}
+	wrapInUnaryMinus := func(child *pb.Node) []*pb.Node {
+		return []*pb.Node{
+			child,
+			pb.Node_builder{
+				CombinationNode: pb.CombinationNode_builder{
+					LeftIndex:          proto.Uint32(0),
+					ArithmeticOperator: pb.CombinationNode_UNARY_MINUS.Enum(),
+				}.Build(),
+			}.Build(),
+		}
+	}
+
+	cases := []struct {
+		expression  string
+		expectNodes []*pb.Node
+		expectRoot  uint32
+	}{
+		// Single numbers
+		{fmt.Sprintf("%d", math.MinInt32), []*pb.Node{int32Leaf(math.MinInt32)}, 0},
+		{fmt.Sprintf("%d", math.MaxInt32), []*pb.Node{int32Leaf(math.MaxInt32)}, 0},
+		{fmt.Sprintf("%d", math.MinInt64), []*pb.Node{int64Leaf(math.MinInt64)}, 0},
+		{fmt.Sprintf("%d", math.MaxInt64), []*pb.Node{int64Leaf(math.MaxInt64)}, 0},
+
+		// Negated negative limits (the unary minus operator on these will overflow).
+		{fmt.Sprintf("-%d", math.MinInt32), wrapInUnaryMinus(int32Leaf(math.MinInt32)), 1},
+		{fmt.Sprintf("-(%d)", math.MinInt32), wrapInUnaryMinus(int32Leaf(math.MinInt32)), 1},
+		{fmt.Sprintf("-%d", math.MinInt64), wrapInUnaryMinus(int64Leaf(math.MinInt64)), 1},
+		{fmt.Sprintf("-(%d)", math.MinInt64), wrapInUnaryMinus(int64Leaf(math.MinInt64)), 1},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.expression, func(t *testing.T) {
+			p := expressions.NewParserShunt(false)
+			sess := map[uint32]expressions.Text{1: {Uncompiled: tc.expression}}
+			rootIndices, nodes, err := p.CompileAll(sess)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if rootIndices[1] != tc.expectRoot {
+				t.Errorf("expected root index %d, got %d", tc.expectRoot, rootIndices[1])
+			}
+			if diff := cmp.Diff(tc.expectNodes, nodes, protocmp.Transform()); diff != "" {
+				t.Errorf("mismatch (-want +got):\n%s", diff)
+			}
+		})
 	}
 }
