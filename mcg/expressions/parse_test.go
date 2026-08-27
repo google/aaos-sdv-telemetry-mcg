@@ -2847,3 +2847,172 @@ func TestShuntParse_TimestampFunctionErrors(t *testing.T) {
 		})
 	}
 }
+
+func TestShuntParse_FunctionArityAndCommaErrors(t *testing.T) {
+	cases := []struct {
+		name        string
+		expression  string
+		expectError string
+	}{
+		{
+			name:        "abs_too_many_args",
+			expression:  "abs(1, 2)",
+			expectError: "Found operand(s) but no operator",
+		},
+		{
+			name:        "round_zero_args",
+			expression:  "round()",
+			expectError: "Missing operand for unary operator: OperatorRound",
+		},
+		{
+			name:        "contains_too_few_args",
+			expression:  "contains(1)",
+			expectError: "Missing operand(s) for binary operator: OperatorContains",
+		},
+		{
+			name:        "contains_too_many_args",
+			expression:  "contains(1, 2, 3)",
+			expectError: "Found operand(s) but no operator",
+		},
+		{
+			name:        "abs_trailing_comma",
+			expression:  "abs(1,)",
+			expectError: "unexpected trailing comma",
+		},
+		{
+			name:        "contains_consecutive_commas",
+			expression:  "contains(1,, 2)",
+			expectError: "unexpected comma: missing argument before comma",
+		},
+		{
+			name:        "comma_outside_function",
+			expression:  "1, 2",
+			expectError: "unexpected comma outside function call",
+		},
+		{
+			name:        "comma_in_parentheses_outside_function",
+			expression:  "(1, 2)",
+			expectError: "unexpected comma outside function call",
+		},
+		{
+			name:        "comma_in_subscript",
+			expression:  "source[1, 2]",
+			expectError: "unexpected comma",
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			p := expressions.NewParserShunt(false)
+			sess := map[uint32]expressions.Text{1: {Uncompiled: tc.expression}}
+			_, _, err := p.CompileAll(sess)
+			if err == nil {
+				t.Fatalf("expected error for %q, got success", tc.expression)
+			}
+			if !strings.Contains(err.Error(), tc.expectError) {
+				t.Errorf("For expression %q, expected error containing %q, but got %q", tc.expression, tc.expectError, err.Error())
+			}
+		})
+	}
+}
+
+func TestShuntParse_NegativeArgumentAfterComma(t *testing.T) {
+	testCases := []struct {
+		name       string
+		expression string
+		expect     []*pb.Node
+	}{
+		{
+			name:       "contains_with_negative_integer",
+			expression: "contains(source.field_1, -1)",
+			expect: []*pb.Node{
+				pb.Node_builder{
+					FieldLeafNode: pb.FieldLeafNode_builder{
+						SourceName: "source",
+						FieldNames: []string{"field_1"},
+					}.Build(),
+				}.Build(),
+				pb.Node_builder{
+					ConstantLeafNode: pb.ConstantLeafNode_builder{
+						Int32Value: proto.Int32(-1),
+					}.Build(),
+				}.Build(),
+				pb.Node_builder{
+					CombinationNode: pb.CombinationNode_builder{
+						LeftIndex:          proto.Uint32(0),
+						RightIndex:         proto.Uint32(1),
+						RelationalOperator: pb.CombinationNode_CONTAINS.Enum(),
+					}.Build(),
+				}.Build(),
+			},
+		},
+		{
+			name:       "doesnotcontain_with_negative_float",
+			expression: "doesnotcontain(source.field_1, -10.5)",
+			expect: []*pb.Node{
+				pb.Node_builder{
+					FieldLeafNode: pb.FieldLeafNode_builder{
+						SourceName: "source",
+						FieldNames: []string{"field_1"},
+					}.Build(),
+				}.Build(),
+				pb.Node_builder{
+					ConstantLeafNode: pb.ConstantLeafNode_builder{
+						FloatValue: proto.Float32(-10.5),
+					}.Build(),
+				}.Build(),
+				pb.Node_builder{
+					CombinationNode: pb.CombinationNode_builder{
+						LeftIndex:          proto.Uint32(0),
+						RightIndex:         proto.Uint32(1),
+						RelationalOperator: pb.CombinationNode_DOES_NOT_CONTAIN.Enum(),
+					}.Build(),
+				}.Build(),
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			p := expressions.NewParserShunt(false)
+			sess := map[uint32]expressions.Text{1: {Uncompiled: tc.expression}}
+			rootIndices, nodes, err := p.CompileAll(sess)
+			if err != nil {
+				t.Fatalf("unexpected compile error: %v", err)
+			}
+			if rootIndices[1] != uint32(len(tc.expect)-1) {
+				t.Errorf("expected root index %d, got %d", len(tc.expect)-1, rootIndices[1])
+			}
+			if diff := cmp.Diff(tc.expect, nodes, protocmp.Transform()); diff != "" {
+				t.Errorf("mismatch (-want +got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestShuntParse_FunctionCommaInfixOperators(t *testing.T) {
+	// contains(1 + 2, 3 * 4) must evaluate (1 + 2) and (3 * 4) as separate arguments, not bind + across the comma
+	p := expressions.NewParserShunt(false)
+	sess := map[uint32]expressions.Text{1: {Uncompiled: "contains(1 + 2, 3 * 4)"}}
+	rootIndices, nodes, err := p.CompileAll(sess)
+	if err != nil {
+		t.Fatalf("unexpected compile error: %v", err)
+	}
+
+	expectNodes := []*pb.Node{
+		pb.Node_builder{ConstantLeafNode: pb.ConstantLeafNode_builder{Int32Value: proto.Int32(1)}.Build()}.Build(),
+		pb.Node_builder{ConstantLeafNode: pb.ConstantLeafNode_builder{Int32Value: proto.Int32(2)}.Build()}.Build(),
+		pb.Node_builder{CombinationNode: pb.CombinationNode_builder{LeftIndex: proto.Uint32(0), RightIndex: proto.Uint32(1), ArithmeticOperator: pb.CombinationNode_ADD.Enum()}.Build()}.Build(),
+		pb.Node_builder{ConstantLeafNode: pb.ConstantLeafNode_builder{Int32Value: proto.Int32(3)}.Build()}.Build(),
+		pb.Node_builder{ConstantLeafNode: pb.ConstantLeafNode_builder{Int32Value: proto.Int32(4)}.Build()}.Build(),
+		pb.Node_builder{CombinationNode: pb.CombinationNode_builder{LeftIndex: proto.Uint32(3), RightIndex: proto.Uint32(4), ArithmeticOperator: pb.CombinationNode_MULTIPLY.Enum()}.Build()}.Build(),
+		pb.Node_builder{CombinationNode: pb.CombinationNode_builder{LeftIndex: proto.Uint32(2), RightIndex: proto.Uint32(5), RelationalOperator: pb.CombinationNode_CONTAINS.Enum()}.Build()}.Build(),
+	}
+
+	if rootIndices[1] != 6 {
+		t.Errorf("expected root index 6, got %d", rootIndices[1])
+	}
+	if diff := cmp.Diff(expectNodes, nodes, protocmp.Transform()); diff != "" {
+		t.Errorf("mismatch (-want +got):\n%s", diff)
+	}
+}

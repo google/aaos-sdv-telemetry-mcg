@@ -62,7 +62,22 @@ func (s *stack[T]) pop() T {
 }
 
 func (s stack[T]) peek() T {
-	return s[len(s)-1]
+	top, ok := s.peekDepth(0)
+	if !ok {
+		panic("Attempted to peek at empty stack.")
+	}
+	return top
+}
+
+// peekDepth returns an element based on its depth from the top.
+// Depth 0 is the top element, depth 1 is the element immediately below, etc.
+func (s stack[T]) peekDepth(depth int) (T, bool) {
+	if depth < 0 || depth >= len(s) {
+		var zero T
+		return zero, false
+	}
+
+	return s[len(s)-1-depth], true
 }
 
 func (s stack[T]) isEmpty() bool {
@@ -208,11 +223,41 @@ func (p *ParserShunt) compileOne(source string) (uint32, error) {
 					return 0, mcgerrors.InvalidExpressionError(source, fmt.Errorf("%v requires parentheses", ttok))
 				}
 				operatorStack.push(ttok)
+			case OperatorComma:
+				if i == 0 || isLastTokenOperator(tokens[:i]) {
+					return 0, mcgerrors.InvalidExpressionError(source, fmt.Errorf("unexpected comma: missing argument before comma"))
+				}
+				foundMatchingOpeningParen := false
+				for !operatorStack.isEmpty() {
+					op := operatorStack.peek()
+					if op == OperatorLeftSquareBracket {
+						return 0, mcgerrors.InvalidExpressionError(source, fmt.Errorf("unexpected comma inside subscript"))
+					}
+					if op == OperatorLeftParen {
+						if parentOp, ok := operatorStack.peekDepth(1); !ok || !isFunctionLike(parentOp) {
+							return 0, mcgerrors.InvalidExpressionError(source, fmt.Errorf("unexpected comma outside function call"))
+						}
+						foundMatchingOpeningParen = true
+						break
+					}
+					operatorStack.pop()
+					n, err := p.buildCombinationNode(op, &operandStack)
+					if err != nil {
+						return 0, mcgerrors.InvalidExpressionError(source, err)
+					}
+					p.pushNodeToOperandStack(n, &operandStack, isComparisonOperator(op))
+				}
+				if !foundMatchingOpeningParen {
+					return 0, mcgerrors.InvalidExpressionError(source, fmt.Errorf("unexpected comma outside function call"))
+				}
 			case OperatorUnaryMinus, OperatorNot:
 				operatorStack.push(ttok)
 			case OperatorLeftParen:
 				operatorStack.push(ttok)
 			case OperatorRightParen:
+				if i > 0 && tokens[i-1] == OperatorComma {
+					return 0, mcgerrors.InvalidExpressionError(source, fmt.Errorf("unexpected trailing comma in function call"))
+				}
 				if err := p.handleRightParen(&operandStack, &operatorStack); err != nil {
 					return 0, mcgerrors.InvalidExpressionError(source, err)
 				}
@@ -514,7 +559,7 @@ func (p *ParserShunt) tokenize(source string) ([]token, error) {
 		} else if c == ']' {
 			tokens = append(tokens, OperatorRightSquareBracket)
 		} else if c == ',' {
-			// skip commas
+			tokens = append(tokens, OperatorComma)
 		} else if unicode.IsSpace(c) {
 			// skip whitespace
 		} else {
@@ -739,6 +784,7 @@ const (
 	OperatorAllEq
 	OperatorAnd
 	OperatorCeil
+	OperatorComma
 	OperatorContains
 	OperatorDivide
 	OperatorDoesNotContain
@@ -770,7 +816,7 @@ const (
 // LINT.ThenChange(parse_test.go)
 
 var precedence []int8 = []int8{
-	OperatorInvalid: 0, OperatorLeftParen: 0, OperatorRightParen: 0, OperatorLeftSquareBracket: 0, OperatorRightSquareBracket: 0,
+	OperatorInvalid: 0, OperatorLeftParen: 0, OperatorRightParen: 0, OperatorLeftSquareBracket: 0, OperatorRightSquareBracket: 0, OperatorComma: 0,
 	OperatorOr:  4,
 	OperatorAnd: 5,
 	OperatorXor: 7,
@@ -875,6 +921,7 @@ var operatorToString []string = []string{
 	OperatorAllEq:              "OperatorAllEq",
 	OperatorAnd:                "OperatorAnd",
 	OperatorCeil:               "OperatorCeil",
+	OperatorComma:              "OperatorComma",
 	OperatorContains:           "OperatorContains",
 	OperatorDivide:             "OperatorDivide",
 	OperatorDoesNotContain:     "OperatorDoesNotContain",

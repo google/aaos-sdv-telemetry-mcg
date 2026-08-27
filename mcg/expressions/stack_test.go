@@ -122,3 +122,97 @@ func TestStack_PointersAndZeroing(t *testing.T) {
 		t.Errorf("expected underlying element at index 1 to be cleared to nil, got %v", underlying[:2][1])
 	}
 }
+
+func TestStack_PeekDepth(t *testing.T) {
+	t.Run("empty_stack", func(t *testing.T) {
+		var s stack[int]
+		for _, depth := range []int{-1, 0, 1, 10} {
+			val, ok := s.peekDepth(depth)
+			if ok {
+				t.Errorf("peekDepth(%d) on empty stack should return ok=false, got val=%v, ok=true", depth, val)
+			}
+			if val != 0 {
+				t.Errorf("peekDepth(%d) on empty stack should return zero value, got %v", depth, val)
+			}
+		}
+	})
+
+	t.Run("elements_accessible_by_depth", func(t *testing.T) {
+		var s stack[string]
+		s.push("first")
+		s.push("second")
+		s.push("third")
+
+		testCases := []struct {
+			depth   int
+			wantVal string
+			wantOk  bool
+		}{
+			{depth: 0, wantVal: "third", wantOk: true},
+			{depth: 1, wantVal: "second", wantOk: true},
+			{depth: 2, wantVal: "first", wantOk: true},
+			{depth: 3, wantVal: "", wantOk: false},
+			{depth: 4, wantVal: "", wantOk: false},
+			{depth: -1, wantVal: "", wantOk: false},
+			{depth: -10, wantVal: "", wantOk: false},
+		}
+
+		for _, tc := range testCases {
+			gotVal, gotOk := s.peekDepth(tc.depth)
+			if gotOk != tc.wantOk {
+				t.Errorf("peekDepth(%d) ok = %v, want %v", tc.depth, gotOk, tc.wantOk)
+			}
+			if gotVal != tc.wantVal {
+				t.Errorf("peekDepth(%d) val = %q, want %q", tc.depth, gotVal, tc.wantVal)
+			}
+		}
+	})
+
+	t.Run("peek_depth_after_pop", func(t *testing.T) {
+		var s stack[int]
+		s.push(100)
+		s.push(200)
+
+		val, ok := s.peekDepth(0)
+		if !ok || val != 200 {
+			t.Fatalf("peekDepth(0) before pop = (%v, %v), want (200, true)", val, ok)
+		}
+
+		s.pop()
+
+		val, ok = s.peekDepth(0)
+		if !ok || val != 100 {
+			t.Errorf("peekDepth(0) after pop = (%v, %v), want (100, true)", val, ok)
+		}
+
+		val, ok = s.peekDepth(1)
+		if ok {
+			t.Errorf("peekDepth(1) after pop should be out of bounds, got (%v, %v)", val, ok)
+		}
+	})
+
+	t.Run("operator_stack_parser_use_case", func(t *testing.T) {
+		// Simulates how parse.go inspects the operator preceding OperatorLeftParen
+		var opStack stack[Operator]
+		opStack.push(OperatorContains)
+		opStack.push(OperatorLeftParen)
+
+		// Top should be LeftParen (depth 0)
+		top, ok := opStack.peekDepth(0)
+		if !ok || top != OperatorLeftParen {
+			t.Errorf("peekDepth(0) = (%v, %v), want (%v, true)", top, ok, OperatorLeftParen)
+		}
+
+		// Preceding operator should be OperatorContains (depth 1)
+		parentOp, ok := opStack.peekDepth(1)
+		if !ok || parentOp != OperatorContains {
+			t.Errorf("peekDepth(1) = (%v, %v), want (%v, true)", parentOp, ok, OperatorContains)
+		}
+
+		// Nothing deeper than that
+		_, ok = opStack.peekDepth(2)
+		if ok {
+			t.Errorf("peekDepth(2) should be out of bounds, got ok=true")
+		}
+	})
+}
