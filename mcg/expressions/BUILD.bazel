@@ -25,7 +25,6 @@ go_library(
     deps = [
         "//mcg/errors",
         "//third_party/aosp/sdv/telemetry/metrics_configuration:telemetry_go_proto",
-        "@org_golang_google_protobuf//encoding/prototext",
         "@org_golang_google_protobuf//proto",
     ],
 )

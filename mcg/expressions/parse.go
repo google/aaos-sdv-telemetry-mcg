@@ -29,7 +29,6 @@ import (
 	"unicode"
 	"unicode/utf8"
 
-	"google.golang.org/protobuf/encoding/prototext"
 	"google.golang.org/protobuf/proto"
 
 	mcgerrors "sdv.googlesource.com/mcg/mcg/errors"
@@ -48,14 +47,14 @@ type operand struct {
 
 type ParserShunt struct {
 	nodes                              []*pb.Node
-	nodeByText                         map[string]uint32
+	nodeByWire                         map[string]uint32
 	disallowComparisonOperatorChaining bool
 }
 
 // NewParserShunt returns a new ParserShunt initialized with the given comparison chaining configuration.
 func NewParserShunt(disallowComparisonOperatorChaining bool) *ParserShunt {
 	return &ParserShunt{
-		nodeByText:                         make(map[string]uint32),
+		nodeByWire:                         make(map[string]uint32),
 		disallowComparisonOperatorChaining: disallowComparisonOperatorChaining,
 	}
 }
@@ -82,12 +81,11 @@ func (p *ParserShunt) CompileAll(uncompiled map[uint32]Text) (map[uint32]uint32,
 
 // Push a deduplicated node proto into the parsing session and return the index.
 func (p *ParserShunt) pushNode(n *pb.Node) uint32 {
-	by, err := prototext.MarshalOptions{EmitUnknown: true}.Marshal(n)
+	by, err := proto.MarshalOptions{Deterministic: true}.Marshal(n)
 	if err != nil {
 		panic(err)
 	}
-	str := string(by)
-	if idx, ok := p.nodeByText[str]; ok {
+	if idx, ok := p.nodeByWire[string(by)]; ok {
 		return idx
 	}
 	// No dupe found, insert
@@ -96,7 +94,7 @@ func (p *ParserShunt) pushNode(n *pb.Node) uint32 {
 		panic("uint32 overflow")
 	}
 	p.nodes = append(p.nodes, n)
-	p.nodeByText[str] = uint32(i)
+	p.nodeByWire[string(by)] = uint32(i)
 	return uint32(i)
 }
 
