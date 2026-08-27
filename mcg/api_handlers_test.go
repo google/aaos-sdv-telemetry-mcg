@@ -1371,3 +1371,68 @@ func TestDisallowComparisonOperatorChainingAPI(t *testing.T) {
 		})
 	}
 }
+
+func TestRightAssociativeExponentiationAPI(t *testing.T) {
+	ctx := context.Background()
+	router, _ := setupServer(ctx, t, false)
+
+	powerPayload := `{
+		"report_configs": [{
+			"name": "report1",
+			"report_incomplete": true,
+			"message_builder": {
+				"message_type": ".google.protobuf.Int32Value",
+				"field_assignments": [{
+					"field_name": "value",
+					"aggregation": {
+						"@type": "none",
+						"expression": "2 ** 3 ** 4"
+					}
+				}]
+			}
+		}]
+	}`
+
+	for _, apiVersion := range []string{"v1", "v2"} {
+		t.Run(fmt.Sprintf("api_%s", apiVersion), func(t *testing.T) {
+			// 1. Right associativity explicitly enabled
+			w := performPostRequest(router,
+				fmt.Sprintf("/api/%s/generate_metrics_config?enable_right_associative_exponentiation=true&ignore_validation=true&no_inference=true", apiVersion),
+				"application/json", "application/x-protobuf", []byte(powerPayload))
+
+			if want, got := http.StatusOK, w.Result().StatusCode; want != got {
+				t.Errorf("POST with enable_right_associative_exponentiation=true returned status %d, want %d. Body: %s", got, want, w.Body.String())
+			}
+
+			// 2. Default behavior (left-associative for now)
+			w2 := performPostRequest(router,
+				fmt.Sprintf("/api/%s/generate_metrics_config?ignore_validation=true&no_inference=true", apiVersion),
+				"application/json", "application/x-protobuf", []byte(powerPayload))
+
+			if want, got := http.StatusOK, w2.Result().StatusCode; want != got {
+				t.Errorf("POST without enable_right_associative_exponentiation returned status %d, want %d. Body: %s", got, want, w2.Body.String())
+			}
+
+			// 3. Right associativity explicitly disabled
+			w3 := performPostRequest(router,
+				fmt.Sprintf("/api/%s/generate_metrics_config?enable_right_associative_exponentiation=false&ignore_validation=true&no_inference=true", apiVersion),
+				"application/json", "application/x-protobuf", []byte(powerPayload))
+
+			if want, got := http.StatusOK, w3.Result().StatusCode; want != got {
+				t.Errorf("POST with enable_right_associative_exponentiation=false returned status %d, want %d. Body: %s", got, want, w3.Body.String())
+			}
+
+			// 4. Invalid boolean parameter (should fail)
+			w4 := performPostRequest(router,
+				fmt.Sprintf("/api/%s/generate_metrics_config?enable_right_associative_exponentiation=invalidBool&ignore_validation=true&no_inference=true", apiVersion),
+				"application/json", "application/x-protobuf", []byte(powerPayload))
+
+			if want, got := http.StatusBadRequest, w4.Result().StatusCode; want != got {
+				t.Errorf("POST with invalid enable_right_associative_exponentiation returned status %d, want %d. Body: %s", got, want, w4.Body.String())
+			}
+			if got := w4.Body.String(); !strings.Contains(got, "Failed to parse boolean value") {
+				t.Errorf("expected error message containing 'Failed to parse boolean value', got: %q", got)
+			}
+		})
+	}
+}

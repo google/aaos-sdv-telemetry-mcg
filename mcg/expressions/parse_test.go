@@ -216,7 +216,7 @@ func TestShuntParseEveryOperator(t *testing.T) {
 	for idx, tc := range cases {
 		sess[uint32(idx)] = expressions.Text{Uncompiled: tc.expression}
 	}
-	p := expressions.NewParserShunt(false)
+	p := expressions.NewParserShunt(false, false)
 	mapping, nodes, err := p.CompileAll(sess)
 	if err != nil {
 		t.Fatal(err)
@@ -240,7 +240,7 @@ func TestShuntParseSource(t *testing.T) {
 	sess[2] = expressions.Text{Uncompiled: "my_source.value"}
 	sess[3] = expressions.Text{Uncompiled: "!my_source.subfield.data_present"}
 
-	p := expressions.NewParserShunt(false)
+	p := expressions.NewParserShunt(false, false)
 	mapping, nodes, err := p.CompileAll(sess)
 	if err != nil {
 		t.Fatal(err)
@@ -319,7 +319,7 @@ func TestUnaryOperatorCombinations(t *testing.T) {
 	for _, expr := range validCases {
 		t.Run("valid_"+expr, func(t *testing.T) {
 			sess := map[uint32]expressions.Text{1: {Uncompiled: expr}}
-			p := expressions.NewParserShunt(false)
+			p := expressions.NewParserShunt(false, false)
 			_, _, err := p.CompileAll(sess)
 			if err != nil {
 				t.Errorf("CompileAll(%q) failed unexpectedly: %v", expr, err)
@@ -376,7 +376,7 @@ func TestShuntParsePrecedence(t *testing.T) {
 				sess[4] = expressions.Text{Uncompiled: fmt.Sprintf(
 					"1 %s (1 %s 1)", opInfoA.operator, opInfoB.operator,
 				)}
-				p := expressions.NewParserShunt(false)
+				p := expressions.NewParserShunt(false, false)
 
 				mapping, nodes, err := p.CompileAll(sess)
 				if err != nil {
@@ -418,7 +418,7 @@ func TestShuntParsePrecedence(t *testing.T) {
 				sess[3] = expressions.Text{Uncompiled: fmt.Sprintf(
 					"%s (abs(1) %s 2)", opInfoU.operator, opInfoA.operator,
 				)}
-				p := expressions.NewParserShunt(false)
+				p := expressions.NewParserShunt(false, false)
 				mapping, nodes, err := p.CompileAll(sess)
 				if err != nil {
 					t.Fatal(err)
@@ -456,7 +456,7 @@ func TestShuntParseWhitespace(t *testing.T) {
 	sess := make(map[uint32]expressions.Text)
 	sess[1] = expressions.Text{Uncompiled: string(allWhiteSpace)}
 
-	p := expressions.NewParserShunt(false)
+	p := expressions.NewParserShunt(false, false)
 	if _, _, err := p.CompileAll(sess); err != nil {
 		t.Error(err)
 	}
@@ -1367,7 +1367,7 @@ func TestShuntParseSingleExpressionSuccess(t *testing.T) {
 			sess[1] = expressions.Text{Uncompiled: tc.expression}
 
 			fmt.Println("start test", tc.name)
-			p := expressions.NewParserShunt(false)
+			p := expressions.NewParserShunt(false, false)
 			mapping, nodes, err := p.CompileAll(sess)
 			if err != nil {
 				t.Fatal(err)
@@ -1457,7 +1457,7 @@ func TestShuntParseConstantLeafNodeTypes(t *testing.T) {
 			// Use an arbitrary key, as there's only one expression per test case.
 			sess[0] = expressions.Text{Uncompiled: tc.expression}
 
-			p := expressions.NewParserShunt(false)
+			p := expressions.NewParserShunt(false, false)
 			mapping, nodes, err := p.CompileAll(sess)
 			if err != nil {
 				t.Fatalf("p.CompileAll(sess) for expression %q failed: %v", tc.expression, err)
@@ -1488,7 +1488,7 @@ func TestShuntParseReuseNodes(t *testing.T) {
 	sess[1] = expressions.Text{Uncompiled: "(2+3*3)/2"}
 	sess[2] = expressions.Text{Uncompiled: "3*3"}
 
-	p := expressions.NewParserShunt(false)
+	p := expressions.NewParserShunt(false, false)
 	mapping, nodes, err := p.CompileAll(sess)
 	if err != nil {
 		t.Fatal(err)
@@ -1533,7 +1533,7 @@ func TestShuntParseMissingOperandError(t *testing.T) {
 			sess := make(map[uint32]expressions.Text)
 			sess[uint32(idx)] = expressions.Text{Uncompiled: tc.expression}
 
-			p := expressions.NewParserShunt(false)
+			p := expressions.NewParserShunt(false, false)
 			_, _, err := p.CompileAll(sess)
 			if want, got := tc.expectError, err; err == nil || !strings.Contains(got.Error(), tc.expectError) {
 				t.Errorf("p.CompileAll(sess) = _, _, %q, want containing %q", got, want)
@@ -1677,7 +1677,7 @@ func TestShuntParseEdgeCases(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			p := expressions.NewParserShunt(false)
+			p := expressions.NewParserShunt(false, false)
 			sess := make(map[uint32]expressions.Text)
 			sess[1] = expressions.Text{Uncompiled: tc.expression}
 
@@ -1865,13 +1865,13 @@ func TestShuntParseDisallowComparisonChaining(t *testing.T) {
 			}
 
 			// Test with chaining allowed (disallow = false)
-			pAllowed := expressions.NewParserShunt(false)
+			pAllowed := expressions.NewParserShunt(false, false)
 			if _, _, err := pAllowed.CompileAll(sess); err != nil {
 				t.Errorf("CompileAll(%q) with disallow=false unexpected error: %v", tc.expression, err)
 			}
 
 			// Test with chaining disallowed (disallow = true)
-			pDisallowed := expressions.NewParserShunt(true)
+			pDisallowed := expressions.NewParserShunt(true, false)
 			_, _, err := pDisallowed.CompileAll(sess)
 			if tc.wantDisallowed {
 				if err == nil {
@@ -1899,7 +1899,7 @@ func TestShuntParseDisallowComparisonChaining_InterExpressionLeak(t *testing.T) 
 		1: {Uncompiled: "(a < b)"},
 		2: {Uncompiled: "a < b < c"},
 	}
-	p := expressions.NewParserShunt(true)
+	p := expressions.NewParserShunt(true, false)
 	_, _, err := p.CompileAll(sess)
 	if err == nil {
 		t.Fatalf("CompileAll(%v) expected error due to comparison operator chaining in expression 2, but got none", sess)
@@ -1948,7 +1948,7 @@ func TestShuntParseNumberLimits(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.expression, func(t *testing.T) {
-			p := expressions.NewParserShunt(false)
+			p := expressions.NewParserShunt(false, false)
 			sess := map[uint32]expressions.Text{1: {Uncompiled: tc.expression}}
 			rootIndices, nodes, err := p.CompileAll(sess)
 			if err != nil {
@@ -2147,7 +2147,7 @@ func TestShuntParseScientificNotationNotAccepted(t *testing.T) {
 
 		for _, tc := range cases {
 			t.Run(tc.name, func(t *testing.T) {
-				p := expressions.NewParserShunt(false)
+				p := expressions.NewParserShunt(false, false)
 				sess := map[uint32]expressions.Text{1: {Uncompiled: tc.expression}}
 				rootIndices, nodes, err := p.CompileAll(sess)
 				if err != nil {
@@ -2175,7 +2175,7 @@ func TestShuntParseScientificNotationNotAccepted(t *testing.T) {
 		}
 		for _, expr := range invalidCases {
 			t.Run(expr, func(t *testing.T) {
-				p := expressions.NewParserShunt(false)
+				p := expressions.NewParserShunt(false, false)
 				sess := map[uint32]expressions.Text{1: {Uncompiled: expr}}
 				_, _, err := p.CompileAll(sess)
 				if err == nil {
@@ -2210,7 +2210,7 @@ func TestShuntParseInf(t *testing.T) {
 		for _, expr := range infCasingCases {
 			fullExpr := pfx.prefix + expr
 			t.Run(fullExpr, func(t *testing.T) {
-				p := expressions.NewParserShunt(false)
+				p := expressions.NewParserShunt(false, false)
 				sess := map[uint32]expressions.Text{1: {Uncompiled: fullExpr}}
 				rootIndices, nodes, err := p.CompileAll(sess)
 				if err != nil {
@@ -2236,7 +2236,7 @@ func TestShuntParseInf(t *testing.T) {
 	// 2. Positive prefix '+' -> fails because '+' is a binary addition operator without a left operand
 	for _, expr := range infCasingCases {
 		t.Run("positive_prefix_+"+expr, func(t *testing.T) {
-			p := expressions.NewParserShunt(false)
+			p := expressions.NewParserShunt(false, false)
 			sess := map[uint32]expressions.Text{1: {Uncompiled: "+" + expr}}
 			_, _, err := p.CompileAll(sess)
 			if err == nil {
@@ -2262,7 +2262,7 @@ func TestShuntParseNaN(t *testing.T) {
 	}
 	for _, expr := range nanCasingCases {
 		t.Run("nan_no_prefix_"+expr, func(t *testing.T) {
-			p := expressions.NewParserShunt(false)
+			p := expressions.NewParserShunt(false, false)
 			sess := map[uint32]expressions.Text{1: {Uncompiled: expr}}
 			rootIndices, nodes, err := p.CompileAll(sess)
 			if err != nil {
@@ -2284,7 +2284,7 @@ func TestShuntParseNaN(t *testing.T) {
 		})
 
 		t.Run("negative_nan_-"+expr, func(t *testing.T) {
-			p := expressions.NewParserShunt(false)
+			p := expressions.NewParserShunt(false, false)
 			sess := map[uint32]expressions.Text{1: {Uncompiled: "-" + expr}}
 			rootIndices, nodes, err := p.CompileAll(sess)
 			if err != nil {
@@ -2312,7 +2312,7 @@ func TestShuntParseNaN(t *testing.T) {
 		})
 
 		t.Run("positive_nan_+"+expr, func(t *testing.T) {
-			p := expressions.NewParserShunt(false)
+			p := expressions.NewParserShunt(false, false)
 			sess := map[uint32]expressions.Text{1: {Uncompiled: "+" + expr}}
 			_, _, err := p.CompileAll(sess)
 			if err == nil {
@@ -2347,7 +2347,7 @@ func TestShuntParse_InvalidFieldPaths(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			p := expressions.NewParserShunt(false)
+			p := expressions.NewParserShunt(false, false)
 			sess := map[uint32]expressions.Text{1: {Uncompiled: tc.expression}}
 			_, _, err := p.CompileAll(sess)
 			if err == nil {
@@ -2598,7 +2598,7 @@ func TestShuntParse_UnaryOperatorsWithParentheses(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			p := expressions.NewParserShunt(false)
+			p := expressions.NewParserShunt(false, false)
 			sess := map[uint32]expressions.Text{1: {Uncompiled: tc.expression}}
 			rootIndices, nodes, err := p.CompileAll(sess)
 			if err != nil {
@@ -2643,7 +2643,7 @@ func TestShuntParse_RedundantParenthesesRejected(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			p := expressions.NewParserShunt(false)
+			p := expressions.NewParserShunt(false, false)
 			sess := map[uint32]expressions.Text{1: {Uncompiled: tc.expression}}
 			_, _, err := p.CompileAll(sess)
 			if err == nil {
@@ -2705,7 +2705,7 @@ func TestShuntParse_NestedFunctionCalls(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			p := expressions.NewParserShunt(false)
+			p := expressions.NewParserShunt(false, false)
 			sess := map[uint32]expressions.Text{1: {Uncompiled: tc.expression}}
 			rootIndices, nodes, err := p.CompileAll(sess)
 			if err != nil {
@@ -2723,7 +2723,7 @@ func TestShuntParse_NestedFunctionCalls(t *testing.T) {
 
 func TestShuntParse_MatchedDelimiters(t *testing.T) {
 	// abs(a[5] + 6)
-	p := expressions.NewParserShunt(false)
+	p := expressions.NewParserShunt(false, false)
 	sess := map[uint32]expressions.Text{1: {Uncompiled: "abs(a[5] + 6)"}}
 	rootIndices, nodes, err := p.CompileAll(sess)
 	if err != nil {
@@ -2792,7 +2792,7 @@ func TestShuntParse_MismatchedDelimiters(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			p := expressions.NewParserShunt(false)
+			p := expressions.NewParserShunt(false, false)
 			sess := map[uint32]expressions.Text{1: {Uncompiled: tc.expression}}
 			_, _, err := p.CompileAll(sess)
 			if err == nil {
@@ -2835,7 +2835,7 @@ func TestShuntParse_TimestampFunctionErrors(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			p := expressions.NewParserShunt(false)
+			p := expressions.NewParserShunt(false, false)
 			sess := map[uint32]expressions.Text{1: {Uncompiled: tc.expression}}
 			_, _, err := p.CompileAll(sess)
 			if err == nil {
@@ -2903,7 +2903,7 @@ func TestShuntParse_FunctionArityAndCommaErrors(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			p := expressions.NewParserShunt(false)
+			p := expressions.NewParserShunt(false, false)
 			sess := map[uint32]expressions.Text{1: {Uncompiled: tc.expression}}
 			_, _, err := p.CompileAll(sess)
 			if err == nil {
@@ -2974,7 +2974,7 @@ func TestShuntParse_NegativeArgumentAfterComma(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			p := expressions.NewParserShunt(false)
+			p := expressions.NewParserShunt(false, false)
 			sess := map[uint32]expressions.Text{1: {Uncompiled: tc.expression}}
 			rootIndices, nodes, err := p.CompileAll(sess)
 			if err != nil {
@@ -2992,7 +2992,7 @@ func TestShuntParse_NegativeArgumentAfterComma(t *testing.T) {
 
 func TestShuntParse_FunctionCommaInfixOperators(t *testing.T) {
 	// contains(1 + 2, 3 * 4) must evaluate (1 + 2) and (3 * 4) as separate arguments, not bind + across the comma
-	p := expressions.NewParserShunt(false)
+	p := expressions.NewParserShunt(false, false)
 	sess := map[uint32]expressions.Text{1: {Uncompiled: "contains(1 + 2, 3 * 4)"}}
 	rootIndices, nodes, err := p.CompileAll(sess)
 	if err != nil {
@@ -3015,4 +3015,60 @@ func TestShuntParse_FunctionCommaInfixOperators(t *testing.T) {
 	if diff := cmp.Diff(expectNodes, nodes, protocmp.Transform()); diff != "" {
 		t.Errorf("mismatch (-want +got):\n%s", diff)
 	}
+}
+
+func TestShuntParse_RightAssociativeExponentiation(t *testing.T) {
+	t.Run("opt_in_right_associative", func(t *testing.T) {
+		// 2 ** 3 ** 4 should evaluate as 2 ** (3 ** 4)
+		p := expressions.NewParserShunt(false, true)
+		sess := map[uint32]expressions.Text{1: {Uncompiled: "2 ** 3 ** 4"}}
+		rootIndices, nodes, err := p.CompileAll(sess)
+		if err != nil {
+			t.Fatalf("unexpected compile error: %v", err)
+		}
+
+		expectNodes := []*pb.Node{
+			pb.Node_builder{ConstantLeafNode: pb.ConstantLeafNode_builder{Int32Value: proto.Int32(2)}.Build()}.Build(),
+			pb.Node_builder{ConstantLeafNode: pb.ConstantLeafNode_builder{Int32Value: proto.Int32(3)}.Build()}.Build(),
+			pb.Node_builder{ConstantLeafNode: pb.ConstantLeafNode_builder{Int32Value: proto.Int32(4)}.Build()}.Build(),
+			// 3 ** 4 is evaluated first (right side)
+			pb.Node_builder{CombinationNode: pb.CombinationNode_builder{LeftIndex: proto.Uint32(1), RightIndex: proto.Uint32(2), ArithmeticOperator: pb.CombinationNode_POWER.Enum()}.Build()}.Build(),
+			// 2 ** (3 ** 4) is the root
+			pb.Node_builder{CombinationNode: pb.CombinationNode_builder{LeftIndex: proto.Uint32(0), RightIndex: proto.Uint32(3), ArithmeticOperator: pb.CombinationNode_POWER.Enum()}.Build()}.Build(),
+		}
+
+		if rootIndices[1] != 4 {
+			t.Errorf("expected root index 4, got %d", rootIndices[1])
+		}
+		if diff := cmp.Diff(expectNodes, nodes, protocmp.Transform()); diff != "" {
+			t.Errorf("mismatch (-want +got):\n%s", diff)
+		}
+	})
+
+	t.Run("default_left_associative", func(t *testing.T) {
+		// 2 ** 3 ** 4 should evaluate as (2 ** 3) ** 4
+		p := expressions.NewParserShunt(false, false)
+		sess := map[uint32]expressions.Text{1: {Uncompiled: "2 ** 3 ** 4"}}
+		rootIndices, nodes, err := p.CompileAll(sess)
+		if err != nil {
+			t.Fatalf("unexpected compile error: %v", err)
+		}
+
+		expectNodes := []*pb.Node{
+			pb.Node_builder{ConstantLeafNode: pb.ConstantLeafNode_builder{Int32Value: proto.Int32(2)}.Build()}.Build(),
+			pb.Node_builder{ConstantLeafNode: pb.ConstantLeafNode_builder{Int32Value: proto.Int32(3)}.Build()}.Build(),
+			// 2 ** 3 is evaluated first (left side)
+			pb.Node_builder{CombinationNode: pb.CombinationNode_builder{LeftIndex: proto.Uint32(0), RightIndex: proto.Uint32(1), ArithmeticOperator: pb.CombinationNode_POWER.Enum()}.Build()}.Build(),
+			pb.Node_builder{ConstantLeafNode: pb.ConstantLeafNode_builder{Int32Value: proto.Int32(4)}.Build()}.Build(),
+			// (2 ** 3) ** 4 is the root
+			pb.Node_builder{CombinationNode: pb.CombinationNode_builder{LeftIndex: proto.Uint32(2), RightIndex: proto.Uint32(3), ArithmeticOperator: pb.CombinationNode_POWER.Enum()}.Build()}.Build(),
+		}
+
+		if rootIndices[1] != 4 {
+			t.Errorf("expected root index 4, got %d", rootIndices[1])
+		}
+		if diff := cmp.Diff(expectNodes, nodes, protocmp.Transform()); diff != "" {
+			t.Errorf("mismatch (-want +got):\n%s", diff)
+		}
+	})
 }

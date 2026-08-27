@@ -85,16 +85,18 @@ func (s stack[T]) isEmpty() bool {
 }
 
 type ParserShunt struct {
-	nodes                              []*pb.Node
-	nodeByWire                         map[string]uint32
-	disallowComparisonOperatorChaining bool
+	nodes                                []*pb.Node
+	nodeByWire                           map[string]uint32
+	disallowComparisonOperatorChaining   bool
+	enableRightAssociativeExponentiation bool
 }
 
-// NewParserShunt returns a new ParserShunt initialized with the given comparison chaining configuration.
-func NewParserShunt(disallowComparisonOperatorChaining bool) *ParserShunt {
+// NewParserShunt returns a new ParserShunt initialized with the given comparison chaining and exponentiation associativity configuration.
+func NewParserShunt(disallowComparisonOperatorChaining bool, enableRightAssociativeExponentiation bool) *ParserShunt {
 	return &ParserShunt{
-		nodeByWire:                         make(map[string]uint32),
-		disallowComparisonOperatorChaining: disallowComparisonOperatorChaining,
+		nodeByWire:                           make(map[string]uint32),
+		disallowComparisonOperatorChaining:   disallowComparisonOperatorChaining,
+		enableRightAssociativeExponentiation: enableRightAssociativeExponentiation,
 	}
 }
 
@@ -272,7 +274,11 @@ func (p *ParserShunt) compileOne(source string) (uint32, error) {
 					return 0, mcgerrors.InvalidExpressionError(source, err)
 				}
 			default:
-				if err := p.collapseOperators(precedence[ttok], &operandStack, &operatorStack); err != nil {
+				targetPrec := precedence[ttok]
+				if p.enableRightAssociativeExponentiation && ttok == OperatorPower {
+					targetPrec++
+				}
+				if err := p.collapseOperators(targetPrec, &operandStack, &operatorStack); err != nil {
 					return 0, mcgerrors.InvalidExpressionError(source, err)
 				}
 				operatorStack.push(ttok)

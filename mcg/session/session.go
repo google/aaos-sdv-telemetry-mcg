@@ -82,6 +82,9 @@ type Session struct {
 
 	// DisallowComparisonOperatorChaining disallows chaining of comparison operators.
 	DisallowComparisonOperatorChaining bool
+
+	// EnableRightAssociativeExponentiation controls whether the exponentiation operator (**) is right-associative.
+	EnableRightAssociativeExponentiation bool
 }
 
 // Save an expression into the session using a session-scoped expression ID.

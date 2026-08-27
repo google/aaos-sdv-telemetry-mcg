@@ -377,7 +377,7 @@ func getReportConfigsWithReplacedIndices(mapping map[uint32]uint32, sessReports 
 //   - s.ConfigUUID is set
 //   - None of the maps in the session are nil
 func compileSession(sess *session.Session) (*pb.MetricsConfig, []*mcgerrors.StatusError, string) {
-	exprParser := expressions.NewParserShunt(sess.DisallowComparisonOperatorChaining)
+	exprParser := expressions.NewParserShunt(sess.DisallowComparisonOperatorChaining, sess.EnableRightAssociativeExponentiation)
 
 	mapping, nodes, err := exprParser.CompileAll(sess.Expressions)
 	if err != nil {
@@ -442,6 +442,15 @@ func getNoInferenceQueryParamValue(c *gin.Context) (bool, *mcgerrors.StatusError
 // its associated enforcement logic should be completely removed.
 func getDisallowComparisonOperatorChainingQueryParamValue(c *gin.Context) (bool, *mcgerrors.StatusError) {
 	return getQueryParamBoolValue(c, "disallow_comparison_operator_chaining")
+}
+
+// getEnableRightAssociativeExponentiationQueryParamValue extracts the enable_right_associative_exponentiation query parameter.
+//
+// This parameter is temporarily introduced as opt-in (defaulting to false) to maintain
+// backward compatibility with existing clients. In the next phase, the default
+// should be updated to true to make exponentiation right-associative by default.
+func getEnableRightAssociativeExponentiationQueryParamValue(c *gin.Context) (bool, *mcgerrors.StatusError) {
+	return getQueryParamBoolValue(c, "enable_right_associative_exponentiation")
 }
 
 func getReturnConfigQueryParamValue(c *gin.Context) (bool, *mcgerrors.StatusError) {
