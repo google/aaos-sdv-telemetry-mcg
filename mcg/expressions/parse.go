@@ -45,6 +45,29 @@ type operand struct {
 	parenthesized bool
 }
 
+type stack[T any] []T
+
+func (s *stack[T]) push(item T) {
+	*s = append(*s, item)
+}
+
+func (s *stack[T]) pop() T {
+	index := len(*s) - 1
+	top := (*s)[index]
+	var zero T
+	(*s)[index] = zero
+	*s = (*s)[:index]
+	return top
+}
+
+func (s stack[T]) peek() T {
+	return s[len(s)-1]
+}
+
+func (s stack[T]) isEmpty() bool {
+	return len(s) == 0
+}
+
 type ParserShunt struct {
 	nodes                              []*pb.Node
 	nodeByWire                         map[string]uint32
@@ -110,8 +133,8 @@ func (p *ParserShunt) compileOne(source string) (uint32, error) {
 		return 0, mcgerrors.InvalidExpressionError(source, err)
 	}
 
-	operandStack := make([]operand, 0, 8)
-	operatorStack := make([]Operator, 0, 8)
+	operandStack := make(stack[operand], 0, 8)
+	operatorStack := make(stack[Operator], 0, 8)
 	for i, tok := range tokens {
 		switch ttok := tok.(type) {
 		case []string:
@@ -134,11 +157,10 @@ func (p *ParserShunt) compileOne(source string) (uint32, error) {
 						return 0, mcgerrors.InvalidExpressionError(source, err)
 					}
 
-					if len(operandStack) == 0 {
+					if operandStack.isEmpty() {
 						return 0, mcgerrors.InvalidExpressionError(source, fmt.Errorf("empty operand stack for postfix field access"))
 					}
-					lhs := operandStack[len(operandStack)-1]
-					operandStack = operandStack[:len(operandStack)-1]
+					lhs := operandStack.pop()
 					fieldLeafNodeBuilder.ExpressionNodeIndex = proto.Uint32(lhs.index)
 				}
 			}
@@ -184,11 +206,11 @@ func (p *ParserShunt) compileOne(source string) (uint32, error) {
 				if nextOp, ok := tokens[i+1].(Operator); !ok || nextOp != OperatorLeftParen {
 					return 0, mcgerrors.InvalidExpressionError(source, fmt.Errorf("%v requires parentheses", ttok))
 				}
-				operatorStack = append(operatorStack, ttok)
+				operatorStack.push(ttok)
 			case OperatorUnaryMinus, OperatorNot:
-				operatorStack = append(operatorStack, ttok)
+				operatorStack.push(ttok)
 			case OperatorLeftParen:
-				operatorStack = append(operatorStack, ttok)
+				operatorStack.push(ttok)
 			case OperatorRightParen:
 				if err := p.handleRightParen(&operandStack, &operatorStack); err != nil {
 					return 0, mcgerrors.InvalidExpressionError(source, err)
@@ -197,8 +219,8 @@ func (p *ParserShunt) compileOne(source string) (uint32, error) {
 				if err := p.collapseOperators(precedence[OperatorSubscript], &operandStack, &operatorStack); err != nil {
 					return 0, mcgerrors.InvalidExpressionError(source, err)
 				}
-				operatorStack = append(operatorStack, OperatorSubscript)
-				operatorStack = append(operatorStack, OperatorLeftSquareBracket)
+				operatorStack.push(OperatorSubscript)
+				operatorStack.push(OperatorLeftSquareBracket)
 			case OperatorRightSquareBracket:
 				if err := p.handleRightSquareBracket(&operandStack, &operatorStack); err != nil {
 					return 0, mcgerrors.InvalidExpressionError(source, err)
@@ -207,11 +229,11 @@ func (p *ParserShunt) compileOne(source string) (uint32, error) {
 				if err := p.collapseOperators(precedence[ttok], &operandStack, &operatorStack); err != nil {
 					return 0, mcgerrors.InvalidExpressionError(source, err)
 				}
-				operatorStack = append(operatorStack, ttok)
+				operatorStack.push(ttok)
 			}
 		}
 	}
-	for len(operatorStack) >= 1 {
+	for !operatorStack.isEmpty() {
 		if slices.Contains(operatorStack, OperatorLeftParen) {
 			return 0, mcgerrors.InvalidExpressionError(source, fmt.Errorf("Found opening parenthesis without matching closing parenthesis"))
 		}
@@ -219,8 +241,7 @@ func (p *ParserShunt) compileOne(source string) (uint32, error) {
 			return 0, mcgerrors.InvalidExpressionError(source, fmt.Errorf("Found opening square bracket without matching closing square bracket"))
 		}
 
-		lastOp := operatorStack[len(operatorStack)-1]
-		operatorStack = operatorStack[:len(operatorStack)-1]
+		lastOp := operatorStack.pop()
 
 		n, err := p.buildCombinationNode(lastOp, &operandStack)
 		if err != nil {
@@ -230,10 +251,10 @@ func (p *ParserShunt) compileOne(source string) (uint32, error) {
 	}
 	if len(operandStack) > 1 {
 		return 0, mcgerrors.InvalidExpressionError(source, fmt.Errorf("Found operand(s) but no operator"))
-	} else if len(operandStack) < 1 {
+	} else if operandStack.isEmpty() {
 		return 0, mcgerrors.InvalidExpressionError(source, fmt.Errorf("Found no valid operands"))
 	}
-	return operandStack[0].index, nil
+	return operandStack.peek().index, nil
 }
 
 // isFunctionLike returns true if op uses parentheses like a function call.
@@ -276,13 +297,13 @@ func isOperand(tok token) bool {
 	return false
 }
 
-func (p *ParserShunt) collapseOperators(targetPrecedence int8, operandStack *[]operand, operatorStack *[]Operator) error {
-	for len(*operatorStack) >= 1 {
-		lastOp := (*operatorStack)[len(*operatorStack)-1]
+func (p *ParserShunt) collapseOperators(targetPrecedence int8, operandStack *stack[operand], operatorStack *stack[Operator]) error {
+	for !operatorStack.isEmpty() {
+		lastOp := operatorStack.peek()
 		if precedence[lastOp] < targetPrecedence {
 			break
 		}
-		*operatorStack = (*operatorStack)[:len(*operatorStack)-1]
+		operatorStack.pop()
 		n, err := p.buildCombinationNode(lastOp, operandStack)
 		if err != nil {
 			return err
@@ -294,20 +315,21 @@ func (p *ParserShunt) collapseOperators(targetPrecedence int8, operandStack *[]o
 
 // Processes the stack when token ')' is encountered. Builds nodes until a
 // matching '(' is found. Returns errors for any mismatched or redundant parenthesis.
-func (p *ParserShunt) handleRightParen(operandStack *[]operand, operatorStack *[]Operator) error {
+func (p *ParserShunt) handleRightParen(operandStack *stack[operand], operatorStack *stack[Operator]) error {
 	foundOperator := false
-	for len(*operatorStack) > 0 {
-		op := (*operatorStack)[len(*operatorStack)-1]
-		*operatorStack = (*operatorStack)[:len(*operatorStack)-1]
+	for !operatorStack.isEmpty() {
+		op := operatorStack.pop()
 
 		if op == OperatorLeftParen {
 			if !foundOperator {
-				if len(*operatorStack) == 0 || !isFunctionLike((*operatorStack)[len(*operatorStack)-1]) {
+				if operatorStack.isEmpty() || !isFunctionLike(operatorStack.peek()) {
 					return fmt.Errorf("Found redundant parenthesis")
 				}
 			}
-			if len(*operandStack) > 0 {
-				(*operandStack)[len(*operandStack)-1].parenthesized = true
+			if !operandStack.isEmpty() {
+				top := operandStack.pop()
+				top.parenthesized = true
+				operandStack.push(top)
 			}
 			return nil
 		}
@@ -323,13 +345,12 @@ func (p *ParserShunt) handleRightParen(operandStack *[]operand, operatorStack *[
 	return fmt.Errorf("Found closing parenthesis without matching opening parenthesis")
 }
 
-func (p *ParserShunt) handleRightSquareBracket(operandStack *[]operand, operatorStack *[]Operator) error {
-	for len(*operatorStack) > 0 {
-		op := (*operatorStack)[len(*operatorStack)-1]
-		*operatorStack = (*operatorStack)[:len(*operatorStack)-1]
+func (p *ParserShunt) handleRightSquareBracket(operandStack *stack[operand], operatorStack *stack[Operator]) error {
+	for !operatorStack.isEmpty() {
+		op := operatorStack.pop()
 
 		if op == OperatorLeftSquareBracket {
-			if len(*operatorStack) == 0 || (*operatorStack)[len(*operatorStack)-1] != OperatorSubscript {
+			if operatorStack.isEmpty() || operatorStack.peek() != OperatorSubscript {
 				return fmt.Errorf("Found square bracket without matching subscript operator")
 			}
 			return nil
@@ -350,23 +371,21 @@ func (p *ParserShunt) getOperatorToProto(op Operator) *pb.CombinationNode {
 }
 
 // Pop the correct number of operands off the stack and create a Node.
-func (p *ParserShunt) buildCombinationNode(op Operator, operandStack *[]operand) (*pb.Node, error) {
+func (p *ParserShunt) buildCombinationNode(op Operator, operandStack *stack[operand]) (*pb.Node, error) {
 	var left, right operand
 	var rightIndex *uint32
 
 	if isUnaryOperator(op) {
-		if len(*operandStack) < 1 {
+		if operandStack.isEmpty() {
 			return nil, fmt.Errorf("Missing operand for unary operator: %v", op)
 		}
-		left = (*operandStack)[len(*operandStack)-1]
-		*operandStack = (*operandStack)[:len(*operandStack)-1]
+		left = operandStack.pop()
 	} else { // Binary operator
 		if len(*operandStack) < 2 {
 			return nil, fmt.Errorf("Missing operand(s) for binary operator: %v", op)
 		}
-		right = (*operandStack)[len(*operandStack)-1]
-		left = (*operandStack)[len(*operandStack)-2]
-		*operandStack = (*operandStack)[:len(*operandStack)-2]
+		right = operandStack.pop()
+		left = operandStack.pop()
 		rightIndex = proto.Uint32(right.index)
 
 		if isComparisonOperator(op) && ((left.isComparison && !left.parenthesized) || (right.isComparison && !right.parenthesized)) {
@@ -402,9 +421,9 @@ func (p *ParserShunt) buildCombinationNode(op Operator, operandStack *[]operand)
 	return n, nil
 }
 
-func (p *ParserShunt) pushNodeToOperandStack(nod *pb.Node, operandStack *[]operand, isComparison bool) {
+func (p *ParserShunt) pushNodeToOperandStack(nod *pb.Node, operandStack *stack[operand], isComparison bool) {
 	id := p.pushNode(nod)
-	*operandStack = append(*operandStack, operand{
+	operandStack.push(operand{
 		index:         id,
 		isComparison:  isComparison,
 		parenthesized: false,

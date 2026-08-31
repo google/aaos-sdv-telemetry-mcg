@@ -32,9 +32,12 @@ go_library(
 go_test(
     name = "expressions_test",
     size = "small",
-    srcs = ["parse_test.go"],
+    srcs = [
+        "parse_test.go",
+        "stack_test.go",
+    ],
+    embed = [":expressions"],
     deps = [
-        ":expressions",
         "//third_party/aosp/sdv/telemetry/metrics_configuration:telemetry_go_proto",
         "@com_github_google_go_cmp//cmp",
         "@org_golang_google_protobuf//proto",
