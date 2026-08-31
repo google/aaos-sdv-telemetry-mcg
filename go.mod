@@ -3,7 +3,7 @@ module sdv.googlesource.com/mcg
 go 1.25.4
 
 require (
-	github.com/bazelbuild/buildtools v0.0.0-20250306161121-931d76d6a639
+	github.com/bazelbuild/buildtools v0.0.0-20250930140053-2eb4fccefb52
 	github.com/cenkalti/backoff v2.2.1+incompatible
 	github.com/gin-gonic/gin v1.10.0
 	github.com/google/go-cmp v0.7.0
@@ -11,8 +11,8 @@ require (
 	github.com/ory/dockertest v3.3.5+incompatible
 	github.com/protocolbuffers/txtpbfmt v0.0.0-20250218085312-1ee4910263ac
 	github.com/redis/go-redis/v9 v9.7.3
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20250303144028-a0af3efb3deb
-	google.golang.org/protobuf v1.36.5
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20250313205543-e70fdf4c4cb4
+	google.golang.org/protobuf v1.36.10
 	gopkg.in/yaml.v3 v3.0.1
 )
 

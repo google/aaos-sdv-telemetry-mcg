@@ -17,7 +17,7 @@
 # See https://cloud.google.com/build/docs/build-config
 steps:
   # 1. Build the container image using the Bazel toolchain.
-  - name: 'eu.gcr.io/cloud-telemetry-simulation/bazel:7.2.1'
+  - name: 'eu.gcr.io/cloud-telemetry-simulation/bazel:9.2.0'
     id: 'Bazel Build and Push'
     entrypoint: 'bash'
     args:

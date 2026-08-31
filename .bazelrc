@@ -5,3 +5,11 @@ test --test_verbose_timeout_warnings
 # This happens, e.g., when VSCode runs a Bazel command with a different PATH
 # environment variable then when you run a Bazel command in your terminal.
 common --incompatible_strict_action_env
+# Silence deprecation warnings during build by opting into the new, non-deprecated behavior.
+common --incompatible_default_to_explicit_init_py
+# mcg does not need an Android SDK; rules_android is only pulled in
+# transitively (e.g. via rules_jvm_external for AAR support and protobuf via
+# rules_kotlin). Do not inherit ambient host ANDROID_HOME in repository rules to
+# prevent rules_android from attempting to configure unused SDK toolchains and
+# failing on outdated build-tools versions on host/CI machines.
+common --repo_env=ANDROID_HOME=

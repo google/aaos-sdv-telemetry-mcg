@@ -13,7 +13,7 @@
 # limitations under the License.
 
 load("@container_structure_test//:defs.bzl", "container_structure_test")
-load("@rules_oci//oci:defs.bzl", "oci_image", "oci_tarball")
+load("@rules_oci//oci:defs.bzl", "oci_image", "oci_load")
 load("@rules_pkg//pkg:tar.bzl", "pkg_tar")
 load("@rules_shell//shell:sh_test.bzl", "sh_test")
 load("@rules_shellcheck//:def.bzl", "shellcheck_test")
@@ -27,20 +27,23 @@ oci_image(
     name = "image_mcg",
     base = "@distroless_base",
     cmd = ["/mcg"],
-    exposed_ports = ":exposed_ports",
+    exposed_ports = ["8005"],
     tars = [":tar_mcg"],
 )
 
 # Packages the image into a tarball suitable for `docker load` and `container_structure_test`.
-oci_tarball(
-    name = "image_mcg_tarball_rule",
+# In rules_oci 2.x, `oci_load` produces the .tar only via its `tarball` output group,
+# so we expose it through a filegroup for downstream rules.
+oci_load(
+    name = "image_mcg_load",
     image = ":image_mcg",
     repo_tags = [],
 )
 
 filegroup(
     name = "image_mcg_tarball",
-    srcs = [":image_mcg_tarball_rule"],
+    srcs = [":image_mcg_load"],
+    output_group = "tarball",
     visibility = ["//visibility:public"],
 )
 
