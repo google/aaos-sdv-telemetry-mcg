@@ -19,13 +19,22 @@ steps:
   # 1. Build the container image using the Bazel toolchain.
   - name: 'eu.gcr.io/cloud-telemetry-simulation/bazel:7.2.1'
     id: 'Bazel Build and Push'
+    entrypoint: 'bash'
     args:
-      - 'build'
-      - '//dist:image_mcg_tarball'
-      - '--compilation_mode=opt'
-      - '--remote_cache=https://storage.googleapis.com/${_BAZEL_CACHE_BUCKET}/mcg' # Cache with GCP's Cloud Bucket Storage enabled to speed up pipeine execution. Cloud Bucket has a lifecycle policy to delete objects older than 7 days.
-      - '--google_default_credentials'
-      - '--remote_upload_local_results=true'
+      - '-c'
+      # Cache with GCP's Cloud Bucket Storage enabled to speed up pipeline
+      # execution. Cloud Bucket has a lifecycle policy to delete objects older
+      # than 7 days.
+      - |
+        bazel build //dist:image_mcg_tarball \
+          --compilation_mode=opt \
+          --remote_cache=https://storage.googleapis.com/${_BAZEL_CACHE_BUCKET}/mcg \
+          --google_default_credentials \
+          --remote_upload_local_results=true \
+        && bazel cquery //dist:image_mcg_tarball \
+          --compilation_mode=opt \
+          --output=files \
+          > /workspace/mcg_tarball_path
 
   # 2. Load the image tarball into the Docker daemon.
   # We write the image name:tag to a file to use in the next step.
@@ -35,7 +44,7 @@ steps:
     args:
       - '-c'
       - >
-        docker load --input bazel-bin/dist/image_mcg_tarball/tarball.tar
+        docker load --input "$(cat /workspace/mcg_tarball_path)"
         | sed 's/Loaded image.*: //'
         > /workspace/mcg_docker_image_id
 

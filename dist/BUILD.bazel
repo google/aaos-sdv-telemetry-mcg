@@ -31,11 +31,17 @@ oci_image(
     tars = [":tar_mcg"],
 )
 
-# This rule squashes the image for the test.
+# Packages the image into a tarball suitable for `docker load` and `container_structure_test`.
 oci_tarball(
-    name = "image_mcg_tarball",
+    name = "image_mcg_tarball_rule",
     image = ":image_mcg",
     repo_tags = [],
+)
+
+filegroup(
+    name = "image_mcg_tarball",
+    srcs = [":image_mcg_tarball_rule"],
+    visibility = ["//visibility:public"],
 )
 
 container_structure_test(
@@ -53,6 +59,9 @@ sh_test(
     size = "small",
     srcs = [
         "smoke_test.sh",
+    ],
+    args = [
+        "$(rootpath :image_mcg_tarball)",
     ],
     data = [
         ":image_mcg_tarball",

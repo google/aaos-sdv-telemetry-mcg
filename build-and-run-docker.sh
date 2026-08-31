@@ -14,7 +14,7 @@
 # limitations under the License.
 
 bazel build //dist:image_mcg_tarball
-docker image load --input bazel-bin/dist/image_mcg_tarball/tarball.tar | tee /tmp/mcg_docker_image_id
+docker image load --input "$(bazel cquery //dist:image_mcg_tarball --output=files)" | tee /tmp/mcg_docker_image_id
 sed -i 's/Loaded image ID: //' /tmp/mcg_docker_image_id
 docker image tag "$(cat /tmp/mcg_docker_image_id)" android-sdv-telemetry-mcg:dev
 docker run android-sdv-telemetry-mcg:dev

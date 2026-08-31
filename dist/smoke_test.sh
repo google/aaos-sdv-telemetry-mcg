@@ -21,7 +21,7 @@ set -euo pipefail
 # ensure password asked
 echo Starting smoke test...
 
-docker image load --input dist/image_mcg_tarball/tarball.tar | tee /tmp/mcg_docker_image_id
+docker image load --input "$1" | tee /tmp/mcg_docker_image_id
 sed -i 's/Loaded image ID: //' /tmp/mcg_docker_image_id
 docker image tag "$(cat /tmp/mcg_docker_image_id)" android-sdv-telemetry-mcg:dev
 
