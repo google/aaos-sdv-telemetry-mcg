@@ -21,6 +21,7 @@ package expressions
 import (
 	"fmt"
 	"log"
+	"math"
 	"regexp"
 	"slices"
 	"sort"
@@ -260,7 +261,7 @@ func (p *ParserShunt) compileOne(source string) (uint32, error) {
 // isFunctionLike returns true if op uses parentheses like a function call.
 func isFunctionLike(op Operator) bool {
 	switch op {
-	case OperatorAllEq, OperatorContains, OperatorDoesNotContain, OperatorFloor, OperatorRound, OperatorCeil, OperatorAbsolute, OperatorUnaryMinus, OperatorLength:
+	case OperatorAllEq, OperatorContains, OperatorDoesNotContain, OperatorFloor, OperatorRound, OperatorCeil, OperatorAbsolute, OperatorLength:
 		return true
 	default:
 		return false
@@ -322,7 +323,7 @@ func (p *ParserShunt) handleRightParen(operandStack *stack[operand], operatorSta
 
 		if op == OperatorLeftParen {
 			if !foundOperator {
-				if operatorStack.isEmpty() || !isFunctionLike(operatorStack.peek()) {
+				if operatorStack.isEmpty() || (!isFunctionLike(operatorStack.peek()) && !isUnaryOperator(operatorStack.peek())) {
 					return fmt.Errorf("Found redundant parenthesis")
 				}
 			}
@@ -331,7 +332,18 @@ func (p *ParserShunt) handleRightParen(operandStack *stack[operand], operatorSta
 				top.parenthesized = true
 				operandStack.push(top)
 			}
+			if !operatorStack.isEmpty() && isFunctionLike(operatorStack.peek()) {
+				fnOp := operatorStack.pop()
+				n, err := p.buildCombinationNode(fnOp, operandStack)
+				if err != nil {
+					return err
+				}
+				p.pushNodeToOperandStack(n, operandStack, isComparisonOperator(fnOp))
+			}
 			return nil
+		}
+		if op == OperatorLeftSquareBracket {
+			return fmt.Errorf("Found closing parenthesis without matching opening parenthesis")
 		}
 
 		foundOperator = true
@@ -354,6 +366,9 @@ func (p *ParserShunt) handleRightSquareBracket(operandStack *stack[operand], ope
 				return fmt.Errorf("Found square bracket without matching subscript operator")
 			}
 			return nil
+		}
+		if op == OperatorLeftParen {
+			return fmt.Errorf("Found closing square bracket without matching opening square bracket")
 		}
 
 		n, err := p.buildCombinationNode(op, operandStack)
@@ -469,6 +484,13 @@ func (p *ParserShunt) tokenize(source string) ([]token, error) {
 					}
 					tokens = append(tokens, val)
 					adv = 1 + lenNumber
+				} else if lenInf := peekInfLen(source[i+1:]); lenInf > 0 {
+					val, err := parseValue(source[i : i+1+lenInf])
+					if err != nil {
+						return nil, err
+					}
+					tokens = append(tokens, val)
+					adv = 1 + lenInf
 				} else {
 					tokens = append(tokens, OperatorUnaryMinus)
 				}
@@ -523,6 +545,7 @@ func isLastTokenOperator(tok []token) bool {
 }
 
 var (
+	rgxInf                = regexp.MustCompile(`^(?i:infinity|inf)(?:[^0-9a-zA-Z_]|$)`)
 	rgxNumber             = regexp.MustCompile("^[0-9.]+")
 	rgxNumberOrIdentifier = regexp.MustCompile("^[0-9a-zA-Z._]+")
 	rgxEndOperator        = regexp.MustCompile("[0-9a-zA-Z._)(" + rgxFragSpaces + rgxUnaryMinus + "\\[\\]]")
@@ -534,6 +557,22 @@ var (
 	rgxUnaryMinus = "\\-"
 	rgxFunction   = regexp.MustCompile(`^timestamp\(.*?\)`)
 )
+
+// Returns the number of contiguous bytes representing "inf" or "infinity" (case-insensitive)
+func peekInfLen(s string) int {
+	loc := rgxInf.FindStringIndex(s)
+	if loc == nil {
+		return 0
+	}
+	match := s[:loc[1]]
+	if len(match) >= 8 && strings.EqualFold(match[:8], "infinity") {
+		return 8
+	}
+	if len(match) >= 3 && strings.EqualFold(match[:3], "inf") {
+		return 3
+	}
+	return 0
+}
 
 // Returns the number of contiguous bytes that might comprise a number
 func peekNumberLen(s string) int {
@@ -585,6 +624,12 @@ func parseFunction(s string) (*pb.Node, error) {
 		}.Build(), nil
 	default:
 		param := regexp.MustCompile(`^timestamp\((.*)\)`).FindStringSubmatch(s)
+		if strings.TrimSpace(param[1]) == "" {
+			return nil, fmt.Errorf("timestamp function requires a parameter")
+		}
+		if strings.Contains(param[1], ",") {
+			return nil, fmt.Errorf("timestamp function expects exactly one parameter")
+		}
 		return nil, fmt.Errorf("%q is not a valid timestamp parameter", param[1])
 	}
 }
@@ -655,13 +700,29 @@ func parseValue(s string) (token, error) {
 	if !strings.ContainsAny(s, "eEpP") {
 		f64, err := strconv.ParseFloat(s, 64)
 		if err == nil {
-			if float64(float32(f64)) == f64 {
-				return float32(f64), nil
+			if f32 := float32(f64); float64(f32) == f64 || (math.IsNaN(float64(f32)) && math.IsNaN(f64)) {
+				return f32, nil
 			}
 			return float64(f64), nil
 		}
 	}
 	split := strings.Split(s, ".")
+	if strings.HasPrefix(s, ".") {
+		if len(split) <= 1 {
+			return nil, fmt.Errorf("invalid field path %q: empty field part", s)
+		}
+		for _, part := range split[1:] {
+			if part == "" {
+				return nil, fmt.Errorf("invalid field path %q: empty field part", s)
+			}
+		}
+	} else {
+		for _, part := range split {
+			if part == "" {
+				return nil, fmt.Errorf("invalid field path %q: empty field part", s)
+			}
+		}
+	}
 	return []string(split), nil
 }
 

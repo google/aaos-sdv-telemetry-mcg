@@ -518,6 +518,7 @@ components:
         **Syntax examples:**
         - **Data access:** `source_name`, `source_name.field`, `source_name.field.subfield`
         - **Arithmetic:** `+`, `-`, `*`, `/`, `%`, `**`
+        - **Special floating-point values:** `Infinity`, `NaN`
         - **Logical:** `&&`, `||`, `!`, `^`
         - **Relational:** `==`, `!=`, `<`, `<=`, `>`, `>=`
         - **List:** `contains(list, item)`, `doesnotcontain(list, item)`, `alleq(list, value)`

@@ -1207,6 +1207,99 @@ func TestShuntParseSingleExpressionSuccess(t *testing.T) {
 			},
 		},
 		{
+			name:       "subscript_field_access_with_infinity",
+			expression: "source[0].infinity",
+			expectRoot: 3,
+			expect: []*pb.Node{
+				pb.Node_builder{
+					FieldLeafNode: pb.FieldLeafNode_builder{
+						SourceName: "source",
+					}.Build(),
+				}.Build(),
+				pb.Node_builder{
+					ConstantLeafNode: pb.ConstantLeafNode_builder{
+						Int32Value: proto.Int32(0),
+					}.Build(),
+				}.Build(),
+				pb.Node_builder{
+					CombinationNode: pb.CombinationNode_builder{
+						LeftIndex:    proto.Uint32(0),
+						RightIndex:   proto.Uint32(1),
+						ListOperator: pb.CombinationNode_SUBSCRIPT.Enum(),
+					}.Build(),
+				}.Build(),
+				pb.Node_builder{
+					FieldLeafNode: pb.FieldLeafNode_builder{
+						SourceName:          "",
+						FieldNames:          []string{"infinity"},
+						ExpressionNodeIndex: proto.Uint32(2),
+					}.Build(),
+				}.Build(),
+			},
+		},
+		{
+			name:       "subscript_field_access_with_true",
+			expression: "source[0].true",
+			expectRoot: 3,
+			expect: []*pb.Node{
+				pb.Node_builder{
+					FieldLeafNode: pb.FieldLeafNode_builder{
+						SourceName: "source",
+					}.Build(),
+				}.Build(),
+				pb.Node_builder{
+					ConstantLeafNode: pb.ConstantLeafNode_builder{
+						Int32Value: proto.Int32(0),
+					}.Build(),
+				}.Build(),
+				pb.Node_builder{
+					CombinationNode: pb.CombinationNode_builder{
+						LeftIndex:    proto.Uint32(0),
+						RightIndex:   proto.Uint32(1),
+						ListOperator: pb.CombinationNode_SUBSCRIPT.Enum(),
+					}.Build(),
+				}.Build(),
+				pb.Node_builder{
+					FieldLeafNode: pb.FieldLeafNode_builder{
+						SourceName:          "",
+						FieldNames:          []string{"true"},
+						ExpressionNodeIndex: proto.Uint32(2),
+					}.Build(),
+				}.Build(),
+			},
+		},
+		{
+			name:       "subscript_field_access_with_nan",
+			expression: "source[0].nan",
+			expectRoot: 3,
+			expect: []*pb.Node{
+				pb.Node_builder{
+					FieldLeafNode: pb.FieldLeafNode_builder{
+						SourceName: "source",
+					}.Build(),
+				}.Build(),
+				pb.Node_builder{
+					ConstantLeafNode: pb.ConstantLeafNode_builder{
+						Int32Value: proto.Int32(0),
+					}.Build(),
+				}.Build(),
+				pb.Node_builder{
+					CombinationNode: pb.CombinationNode_builder{
+						LeftIndex:    proto.Uint32(0),
+						RightIndex:   proto.Uint32(1),
+						ListOperator: pb.CombinationNode_SUBSCRIPT.Enum(),
+					}.Build(),
+				}.Build(),
+				pb.Node_builder{
+					FieldLeafNode: pb.FieldLeafNode_builder{
+						SourceName:          "",
+						FieldNames:          []string{"nan"},
+						ExpressionNodeIndex: proto.Uint32(2),
+					}.Build(),
+				}.Build(),
+			},
+		},
+		{
 			name:       "test_floor_leading_dot",
 			expression: "floor(.5)",
 			expectRoot: 1,
@@ -2091,4 +2184,666 @@ func TestShuntParseScientificNotationNotAccepted(t *testing.T) {
 			})
 		}
 	})
+}
+
+func TestShuntParseInf(t *testing.T) {
+	infCasingCases := []string{
+		"inf",
+		"Inf",
+		"INF",
+		"iNf",
+		"infinity",
+		"Infinity",
+		"INFINITY",
+		"InFiNiTy",
+	}
+
+	// 1. No prefix (parsed as +Inf) and negative prefix '-' (parsed as -Inf)
+	prefixes := []struct {
+		prefix    string
+		expectVal float32
+	}{
+		{"", float32(math.Inf(1))},
+		{"-", float32(math.Inf(-1))},
+	}
+	for _, pfx := range prefixes {
+		for _, expr := range infCasingCases {
+			fullExpr := pfx.prefix + expr
+			t.Run(fullExpr, func(t *testing.T) {
+				p := expressions.NewParserShunt(false)
+				sess := map[uint32]expressions.Text{1: {Uncompiled: fullExpr}}
+				rootIndices, nodes, err := p.CompileAll(sess)
+				if err != nil {
+					t.Fatalf("unexpected error for %q: %v", fullExpr, err)
+				}
+				expectNodes := []*pb.Node{
+					pb.Node_builder{
+						ConstantLeafNode: pb.ConstantLeafNode_builder{
+							FloatValue: proto.Float32(pfx.expectVal),
+						}.Build(),
+					}.Build(),
+				}
+				if rootIndices[1] != 0 {
+					t.Errorf("expected root index 0, got %d", rootIndices[1])
+				}
+				if diff := cmp.Diff(expectNodes, nodes, protocmp.Transform()); diff != "" {
+					t.Errorf("mismatch (-want +got):\n%s", diff)
+				}
+			})
+		}
+	}
+
+	// 2. Positive prefix '+' -> fails because '+' is a binary addition operator without a left operand
+	for _, expr := range infCasingCases {
+		t.Run("positive_prefix_+"+expr, func(t *testing.T) {
+			p := expressions.NewParserShunt(false)
+			sess := map[uint32]expressions.Text{1: {Uncompiled: "+" + expr}}
+			_, _, err := p.CompileAll(sess)
+			if err == nil {
+				t.Fatalf("expected error for +%s, got success", expr)
+			}
+		})
+	}
+}
+
+func TestShuntParseNaN(t *testing.T) {
+	cmpOpts := []cmp.Option{
+		protocmp.Transform(),
+		cmp.Comparer(func(x, y float32) bool {
+			return (math.IsNaN(float64(x)) && math.IsNaN(float64(y))) || x == y
+		}),
+	}
+
+	nanCasingCases := []string{
+		"nan",
+		"NaN",
+		"NAN",
+		"nAn",
+	}
+	for _, expr := range nanCasingCases {
+		t.Run("nan_no_prefix_"+expr, func(t *testing.T) {
+			p := expressions.NewParserShunt(false)
+			sess := map[uint32]expressions.Text{1: {Uncompiled: expr}}
+			rootIndices, nodes, err := p.CompileAll(sess)
+			if err != nil {
+				t.Fatalf("unexpected error for %q: %v", expr, err)
+			}
+			expectNodes := []*pb.Node{
+				pb.Node_builder{
+					ConstantLeafNode: pb.ConstantLeafNode_builder{
+						FloatValue: proto.Float32(float32(math.NaN())),
+					}.Build(),
+				}.Build(),
+			}
+			if rootIndices[1] != 0 {
+				t.Errorf("expected root index 0, got %d", rootIndices[1])
+			}
+			if diff := cmp.Diff(expectNodes, nodes, cmpOpts...); diff != "" {
+				t.Errorf("mismatch (-want +got):\n%s", diff)
+			}
+		})
+
+		t.Run("negative_nan_-"+expr, func(t *testing.T) {
+			p := expressions.NewParserShunt(false)
+			sess := map[uint32]expressions.Text{1: {Uncompiled: "-" + expr}}
+			rootIndices, nodes, err := p.CompileAll(sess)
+			if err != nil {
+				t.Fatalf("unexpected error for -%s: %v", expr, err)
+			}
+			expectNodes := []*pb.Node{
+				pb.Node_builder{
+					ConstantLeafNode: pb.ConstantLeafNode_builder{
+						FloatValue: proto.Float32(float32(math.NaN())),
+					}.Build(),
+				}.Build(),
+				pb.Node_builder{
+					CombinationNode: pb.CombinationNode_builder{
+						LeftIndex:          proto.Uint32(0),
+						ArithmeticOperator: pb.CombinationNode_UNARY_MINUS.Enum(),
+					}.Build(),
+				}.Build(),
+			}
+			if rootIndices[1] != 1 {
+				t.Errorf("expected root index 1, got %d", rootIndices[1])
+			}
+			if diff := cmp.Diff(expectNodes, nodes, cmpOpts...); diff != "" {
+				t.Errorf("mismatch (-want +got):\n%s", diff)
+			}
+		})
+
+		t.Run("positive_nan_+"+expr, func(t *testing.T) {
+			p := expressions.NewParserShunt(false)
+			sess := map[uint32]expressions.Text{1: {Uncompiled: "+" + expr}}
+			_, _, err := p.CompileAll(sess)
+			if err == nil {
+				t.Fatalf("expected error for +%s, got success", expr)
+			}
+		})
+	}
+}
+
+func TestShuntParse_InvalidFieldPaths(t *testing.T) {
+	cases := []struct {
+		name       string
+		expression string
+	}{
+		{
+			name:       "consecutive_dots_in_root_field",
+			expression: "source..field",
+		},
+		{
+			name:       "trailing_dot_in_root_field",
+			expression: "source.field.",
+		},
+		{
+			name:       "consecutive_dots_in_postfix_field",
+			expression: "source[0]..field",
+		},
+		{
+			name:       "triple_dots",
+			expression: "...",
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			p := expressions.NewParserShunt(false)
+			sess := map[uint32]expressions.Text{1: {Uncompiled: tc.expression}}
+			_, _, err := p.CompileAll(sess)
+			if err == nil {
+				t.Fatalf("expected compile error for %q, got success", tc.expression)
+			}
+		})
+	}
+}
+
+func TestShuntParse_UnaryOperatorsWithParentheses(t *testing.T) {
+	testCases := []struct {
+		name        string
+		expression  string
+		expectNodes []*pb.Node
+		expectRoot  uint32
+	}{
+		{
+			name:       "not_with_parenthesized_field",
+			expression: "!(source.a)",
+			expectNodes: []*pb.Node{
+				pb.Node_builder{
+					FieldLeafNode: pb.FieldLeafNode_builder{
+						SourceName: "source",
+						FieldNames: []string{"a"},
+					}.Build(),
+				}.Build(),
+				pb.Node_builder{
+					CombinationNode: pb.CombinationNode_builder{
+						LeftIndex:       proto.Uint32(0),
+						LogicalOperator: pb.CombinationNode_NOT.Enum(),
+					}.Build(),
+				}.Build(),
+			},
+			expectRoot: 1,
+		},
+		{
+			name:       "not_with_parenthesized_bool_literal",
+			expression: "!(true)",
+			expectNodes: []*pb.Node{
+				pb.Node_builder{
+					ConstantLeafNode: pb.ConstantLeafNode_builder{
+						BoolValue: proto.Bool(true),
+					}.Build(),
+				}.Build(),
+				pb.Node_builder{
+					CombinationNode: pb.CombinationNode_builder{
+						LeftIndex:       proto.Uint32(0),
+						LogicalOperator: pb.CombinationNode_NOT.Enum(),
+					}.Build(),
+				}.Build(),
+			},
+			expectRoot: 1,
+		},
+		{
+			name:       "not_with_parenthesized_comparison",
+			expression: "!(source.a < 5)",
+			expectNodes: []*pb.Node{
+				pb.Node_builder{
+					FieldLeafNode: pb.FieldLeafNode_builder{
+						SourceName: "source",
+						FieldNames: []string{"a"},
+					}.Build(),
+				}.Build(),
+				pb.Node_builder{
+					ConstantLeafNode: pb.ConstantLeafNode_builder{
+						Int32Value: proto.Int32(5),
+					}.Build(),
+				}.Build(),
+				pb.Node_builder{
+					CombinationNode: pb.CombinationNode_builder{
+						LeftIndex:          proto.Uint32(0),
+						RightIndex:         proto.Uint32(1),
+						RelationalOperator: pb.CombinationNode_LT.Enum(),
+					}.Build(),
+				}.Build(),
+				pb.Node_builder{
+					CombinationNode: pb.CombinationNode_builder{
+						LeftIndex:       proto.Uint32(2),
+						LogicalOperator: pb.CombinationNode_NOT.Enum(),
+					}.Build(),
+				}.Build(),
+			},
+			expectRoot: 3,
+		},
+		{
+			name:       "unary_minus_with_parenthesized_field",
+			expression: "-(source.a)",
+			expectNodes: []*pb.Node{
+				pb.Node_builder{
+					FieldLeafNode: pb.FieldLeafNode_builder{
+						SourceName: "source",
+						FieldNames: []string{"a"},
+					}.Build(),
+				}.Build(),
+				pb.Node_builder{
+					CombinationNode: pb.CombinationNode_builder{
+						LeftIndex:          proto.Uint32(0),
+						ArithmeticOperator: pb.CombinationNode_UNARY_MINUS.Enum(),
+					}.Build(),
+				}.Build(),
+			},
+			expectRoot: 1,
+		},
+		{
+			name:       "unary_minus_with_parenthesized_constant",
+			expression: "-(123)",
+			expectNodes: []*pb.Node{
+				pb.Node_builder{
+					ConstantLeafNode: pb.ConstantLeafNode_builder{
+						Int32Value: proto.Int32(123),
+					}.Build(),
+				}.Build(),
+				pb.Node_builder{
+					CombinationNode: pb.CombinationNode_builder{
+						LeftIndex:          proto.Uint32(0),
+						ArithmeticOperator: pb.CombinationNode_UNARY_MINUS.Enum(),
+					}.Build(),
+				}.Build(),
+			},
+			expectRoot: 1,
+		},
+		{
+			name:       "unary_minus_with_parenthesized_binary_addition",
+			expression: "-(source.a + 1)",
+			expectNodes: []*pb.Node{
+				pb.Node_builder{
+					FieldLeafNode: pb.FieldLeafNode_builder{
+						SourceName: "source",
+						FieldNames: []string{"a"},
+					}.Build(),
+				}.Build(),
+				pb.Node_builder{
+					ConstantLeafNode: pb.ConstantLeafNode_builder{
+						Int32Value: proto.Int32(1),
+					}.Build(),
+				}.Build(),
+				pb.Node_builder{
+					CombinationNode: pb.CombinationNode_builder{
+						LeftIndex:          proto.Uint32(0),
+						RightIndex:         proto.Uint32(1),
+						ArithmeticOperator: pb.CombinationNode_ADD.Enum(),
+					}.Build(),
+				}.Build(),
+				pb.Node_builder{
+					CombinationNode: pb.CombinationNode_builder{
+						LeftIndex:          proto.Uint32(2),
+						ArithmeticOperator: pb.CombinationNode_UNARY_MINUS.Enum(),
+					}.Build(),
+				}.Build(),
+			},
+			expectRoot: 3,
+		},
+		{
+			name:       "double_not_with_parentheses",
+			expression: "!(!(source.a))",
+			expectNodes: []*pb.Node{
+				pb.Node_builder{
+					FieldLeafNode: pb.FieldLeafNode_builder{
+						SourceName: "source",
+						FieldNames: []string{"a"},
+					}.Build(),
+				}.Build(),
+				pb.Node_builder{
+					CombinationNode: pb.CombinationNode_builder{
+						LeftIndex:       proto.Uint32(0),
+						LogicalOperator: pb.CombinationNode_NOT.Enum(),
+					}.Build(),
+				}.Build(),
+				pb.Node_builder{
+					CombinationNode: pb.CombinationNode_builder{
+						LeftIndex:       proto.Uint32(1),
+						LogicalOperator: pb.CombinationNode_NOT.Enum(),
+					}.Build(),
+				}.Build(),
+			},
+			expectRoot: 2,
+		},
+		{
+			name:       "double_unary_minus_with_parentheses",
+			expression: "-(-(source.a))",
+			expectNodes: []*pb.Node{
+				pb.Node_builder{
+					FieldLeafNode: pb.FieldLeafNode_builder{
+						SourceName: "source",
+						FieldNames: []string{"a"},
+					}.Build(),
+				}.Build(),
+				pb.Node_builder{
+					CombinationNode: pb.CombinationNode_builder{
+						LeftIndex:          proto.Uint32(0),
+						ArithmeticOperator: pb.CombinationNode_UNARY_MINUS.Enum(),
+					}.Build(),
+				}.Build(),
+				pb.Node_builder{
+					CombinationNode: pb.CombinationNode_builder{
+						LeftIndex:          proto.Uint32(1),
+						ArithmeticOperator: pb.CombinationNode_UNARY_MINUS.Enum(),
+					}.Build(),
+				}.Build(),
+			},
+			expectRoot: 2,
+		},
+		{
+			name:       "not_of_unary_minus_with_parentheses",
+			expression: "!(-(source.a))",
+			expectNodes: []*pb.Node{
+				pb.Node_builder{
+					FieldLeafNode: pb.FieldLeafNode_builder{
+						SourceName: "source",
+						FieldNames: []string{"a"},
+					}.Build(),
+				}.Build(),
+				pb.Node_builder{
+					CombinationNode: pb.CombinationNode_builder{
+						LeftIndex:          proto.Uint32(0),
+						ArithmeticOperator: pb.CombinationNode_UNARY_MINUS.Enum(),
+					}.Build(),
+				}.Build(),
+				pb.Node_builder{
+					CombinationNode: pb.CombinationNode_builder{
+						LeftIndex:       proto.Uint32(1),
+						LogicalOperator: pb.CombinationNode_NOT.Enum(),
+					}.Build(),
+				}.Build(),
+			},
+			expectRoot: 2,
+		},
+		{
+			name:       "function_floor_single_arg_not_redundant",
+			expression: "floor(source.a)",
+			expectNodes: []*pb.Node{
+				pb.Node_builder{
+					FieldLeafNode: pb.FieldLeafNode_builder{
+						SourceName: "source",
+						FieldNames: []string{"a"},
+					}.Build(),
+				}.Build(),
+				pb.Node_builder{
+					CombinationNode: pb.CombinationNode_builder{
+						LeftIndex:        proto.Uint32(0),
+						RoundingOperator: pb.CombinationNode_FLOOR.Enum(),
+					}.Build(),
+				}.Build(),
+			},
+			expectRoot: 1,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			p := expressions.NewParserShunt(false)
+			sess := map[uint32]expressions.Text{1: {Uncompiled: tc.expression}}
+			rootIndices, nodes, err := p.CompileAll(sess)
+			if err != nil {
+				t.Fatalf("unexpected compile error: %v", err)
+			}
+			if rootIndices[1] != tc.expectRoot {
+				t.Errorf("expected root index %d, got %d", tc.expectRoot, rootIndices[1])
+			}
+			if diff := cmp.Diff(tc.expectNodes, nodes, protocmp.Transform()); diff != "" {
+				t.Errorf("mismatch (-want +got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestShuntParse_RedundantParenthesesRejected(t *testing.T) {
+	cases := []struct {
+		name       string
+		expression string
+	}{
+		{
+			name:       "redundant_bare_parentheses_identifier",
+			expression: "((source.a))",
+		},
+		{
+			name:       "redundant_bare_parentheses_constant",
+			expression: "((123))",
+		},
+		{
+			name:       "redundant_outer_parentheses_binary_expr",
+			expression: "((source.a + 1))",
+		},
+		{
+			name:       "redundant_double_parens_in_unary_minus",
+			expression: "-((source.a))",
+		},
+		{
+			name:       "redundant_double_parens_in_not",
+			expression: "!((source.a))",
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			p := expressions.NewParserShunt(false)
+			sess := map[uint32]expressions.Text{1: {Uncompiled: tc.expression}}
+			_, _, err := p.CompileAll(sess)
+			if err == nil {
+				t.Fatalf("expected error for %q, got success", tc.expression)
+			}
+			if !strings.Contains(err.Error(), "Found redundant parenthesis") {
+				t.Errorf("expected error containing 'Found redundant parenthesis', got: %v", err)
+			}
+		})
+	}
+}
+
+func TestShuntParse_NestedFunctionCalls(t *testing.T) {
+	cases := []struct {
+		name        string
+		expression  string
+		expectRoot  uint32
+		expectNodes []*pb.Node
+	}{
+		{
+			name:       "both_arguments_nested",
+			expression: "contains(doesnotcontain(source.a, 1), doesnotcontain(source.b, 2))",
+			expectRoot: 6,
+			expectNodes: []*pb.Node{
+				pb.Node_builder{FieldLeafNode: pb.FieldLeafNode_builder{SourceName: "source", FieldNames: []string{"a"}}.Build()}.Build(),
+				pb.Node_builder{ConstantLeafNode: pb.ConstantLeafNode_builder{Int32Value: proto.Int32(1)}.Build()}.Build(),
+				pb.Node_builder{CombinationNode: pb.CombinationNode_builder{LeftIndex: proto.Uint32(0), RightIndex: proto.Uint32(1), RelationalOperator: pb.CombinationNode_DOES_NOT_CONTAIN.Enum()}.Build()}.Build(),
+				pb.Node_builder{FieldLeafNode: pb.FieldLeafNode_builder{SourceName: "source", FieldNames: []string{"b"}}.Build()}.Build(),
+				pb.Node_builder{ConstantLeafNode: pb.ConstantLeafNode_builder{Int32Value: proto.Int32(2)}.Build()}.Build(),
+				pb.Node_builder{CombinationNode: pb.CombinationNode_builder{LeftIndex: proto.Uint32(3), RightIndex: proto.Uint32(4), RelationalOperator: pb.CombinationNode_DOES_NOT_CONTAIN.Enum()}.Build()}.Build(),
+				pb.Node_builder{CombinationNode: pb.CombinationNode_builder{LeftIndex: proto.Uint32(2), RightIndex: proto.Uint32(5), RelationalOperator: pb.CombinationNode_CONTAINS.Enum()}.Build()}.Build(),
+			},
+		},
+		{
+			name:       "second_argument_nested",
+			expression: "doesnotcontain(source.a, contains(source.b, 1))",
+			expectRoot: 4,
+			expectNodes: []*pb.Node{
+				pb.Node_builder{FieldLeafNode: pb.FieldLeafNode_builder{SourceName: "source", FieldNames: []string{"a"}}.Build()}.Build(),
+				pb.Node_builder{FieldLeafNode: pb.FieldLeafNode_builder{SourceName: "source", FieldNames: []string{"b"}}.Build()}.Build(),
+				pb.Node_builder{ConstantLeafNode: pb.ConstantLeafNode_builder{Int32Value: proto.Int32(1)}.Build()}.Build(),
+				pb.Node_builder{CombinationNode: pb.CombinationNode_builder{LeftIndex: proto.Uint32(1), RightIndex: proto.Uint32(2), RelationalOperator: pb.CombinationNode_CONTAINS.Enum()}.Build()}.Build(),
+				pb.Node_builder{CombinationNode: pb.CombinationNode_builder{LeftIndex: proto.Uint32(0), RightIndex: proto.Uint32(3), RelationalOperator: pb.CombinationNode_DOES_NOT_CONTAIN.Enum()}.Build()}.Build(),
+			},
+		},
+		{
+			name:       "first_argument_nested",
+			expression: "doesnotcontain(contains(source.a, 1), source.b)",
+			expectRoot: 4,
+			expectNodes: []*pb.Node{
+				pb.Node_builder{FieldLeafNode: pb.FieldLeafNode_builder{SourceName: "source", FieldNames: []string{"a"}}.Build()}.Build(),
+				pb.Node_builder{ConstantLeafNode: pb.ConstantLeafNode_builder{Int32Value: proto.Int32(1)}.Build()}.Build(),
+				pb.Node_builder{CombinationNode: pb.CombinationNode_builder{LeftIndex: proto.Uint32(0), RightIndex: proto.Uint32(1), RelationalOperator: pb.CombinationNode_CONTAINS.Enum()}.Build()}.Build(),
+				pb.Node_builder{FieldLeafNode: pb.FieldLeafNode_builder{SourceName: "source", FieldNames: []string{"b"}}.Build()}.Build(),
+				pb.Node_builder{CombinationNode: pb.CombinationNode_builder{LeftIndex: proto.Uint32(2), RightIndex: proto.Uint32(3), RelationalOperator: pb.CombinationNode_DOES_NOT_CONTAIN.Enum()}.Build()}.Build(),
+			},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			p := expressions.NewParserShunt(false)
+			sess := map[uint32]expressions.Text{1: {Uncompiled: tc.expression}}
+			rootIndices, nodes, err := p.CompileAll(sess)
+			if err != nil {
+				t.Fatalf("unexpected compile error: %v", err)
+			}
+			if rootIndices[1] != tc.expectRoot {
+				t.Errorf("expected root index %d, got %d", tc.expectRoot, rootIndices[1])
+			}
+			if diff := cmp.Diff(tc.expectNodes, nodes, protocmp.Transform()); diff != "" {
+				t.Errorf("mismatch (-want +got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestShuntParse_MatchedDelimiters(t *testing.T) {
+	// abs(a[5] + 6)
+	p := expressions.NewParserShunt(false)
+	sess := map[uint32]expressions.Text{1: {Uncompiled: "abs(a[5] + 6)"}}
+	rootIndices, nodes, err := p.CompileAll(sess)
+	if err != nil {
+		t.Fatalf("unexpected compile error: %v", err)
+	}
+	if rootIndices[1] != 5 {
+		t.Errorf("expected root index 5, got %d", rootIndices[1])
+	}
+
+	expectNodes := []*pb.Node{
+		pb.Node_builder{FieldLeafNode: pb.FieldLeafNode_builder{SourceName: "a"}.Build()}.Build(),
+		pb.Node_builder{ConstantLeafNode: pb.ConstantLeafNode_builder{Int32Value: proto.Int32(5)}.Build()}.Build(),
+		pb.Node_builder{CombinationNode: pb.CombinationNode_builder{LeftIndex: proto.Uint32(0), RightIndex: proto.Uint32(1), ListOperator: pb.CombinationNode_SUBSCRIPT.Enum()}.Build()}.Build(),
+		pb.Node_builder{ConstantLeafNode: pb.ConstantLeafNode_builder{Int32Value: proto.Int32(6)}.Build()}.Build(),
+		pb.Node_builder{CombinationNode: pb.CombinationNode_builder{LeftIndex: proto.Uint32(2), RightIndex: proto.Uint32(3), ArithmeticOperator: pb.CombinationNode_ADD.Enum()}.Build()}.Build(),
+		pb.Node_builder{CombinationNode: pb.CombinationNode_builder{LeftIndex: proto.Uint32(4), ArithmeticOperator: pb.CombinationNode_ABSOLUTE.Enum()}.Build()}.Build(),
+	}
+
+	if diff := cmp.Diff(expectNodes, nodes, protocmp.Transform()); diff != "" {
+		t.Errorf("mismatch (-want +got):\n%s", diff)
+	}
+}
+
+func TestShuntParse_MismatchedDelimiters(t *testing.T) {
+	cases := []struct {
+		name        string
+		expression  string
+		expectError string
+	}{
+		{
+			name:        "paren_closed_with_bracket",
+			expression:  "(1 + 2]",
+			expectError: "Found closing square bracket without matching opening square bracket",
+		},
+		{
+			name:        "bracket_closed_with_paren",
+			expression:  "source[0)",
+			expectError: "Found closing parenthesis without matching opening parenthesis",
+		},
+		{
+			name:        "bracket_with_expression_closed_with_paren",
+			expression:  "source[1 + 2)",
+			expectError: "Found closing parenthesis without matching opening parenthesis",
+		},
+		{
+			name:        "function_paren_closed_with_bracket",
+			expression:  "alleq(1, 2]",
+			expectError: "Found closing square bracket without matching opening square bracket",
+		},
+		{
+			name:        "function_subscript_closed_with_paren",
+			expression:  "abs(a[5)",
+			expectError: "Found closing parenthesis without matching opening parenthesis",
+		},
+		{
+			name:        "function_paren_closed_with_bracket_no_subscript",
+			expression:  "abs(a5])",
+			expectError: "Found closing square bracket without matching opening square bracket",
+		},
+		{
+			name:        "function_paren_closed_with_bracket_followed_by_tokens",
+			expression:  "abs(1] bla)",
+			expectError: "Found closing square bracket without matching opening square bracket",
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			p := expressions.NewParserShunt(false)
+			sess := map[uint32]expressions.Text{1: {Uncompiled: tc.expression}}
+			_, _, err := p.CompileAll(sess)
+			if err == nil {
+				t.Fatalf("expected error for %q, got success", tc.expression)
+			}
+			if !strings.Contains(err.Error(), tc.expectError) {
+				t.Errorf("For expression %q, expected error containing %q, but got %q", tc.expression, tc.expectError, err.Error())
+			}
+		})
+	}
+}
+
+func TestShuntParse_TimestampFunctionErrors(t *testing.T) {
+	cases := []struct {
+		name        string
+		expression  string
+		expectError string
+	}{
+		{
+			name:        "timestamp_zero_args",
+			expression:  "timestamp()",
+			expectError: "timestamp function requires a parameter",
+		},
+		{
+			name:        "timestamp_whitespace_args",
+			expression:  "timestamp(   )",
+			expectError: "timestamp function requires a parameter",
+		},
+		{
+			name:        "timestamp_multiple_args",
+			expression:  "timestamp(REALTIME_CLOCK, MONOTONIC_TIME_SINCE_BOOT)",
+			expectError: "timestamp function expects exactly one parameter",
+		},
+		{
+			name:        "timestamp_invalid_clock_name",
+			expression:  "timestamp(UNKNOWN_CLOCK)",
+			expectError: "\"UNKNOWN_CLOCK\" is not a valid timestamp parameter",
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			p := expressions.NewParserShunt(false)
+			sess := map[uint32]expressions.Text{1: {Uncompiled: tc.expression}}
+			_, _, err := p.CompileAll(sess)
+			if err == nil {
+				t.Fatalf("expected error for %q, got nil", tc.expression)
+			}
+			if !strings.Contains(err.Error(), tc.expectError) {
+				t.Errorf("error %q does not contain expected substring %q", err.Error(), tc.expectError)
+			}
+		})
+	}
 }
