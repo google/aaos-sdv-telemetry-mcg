@@ -69,6 +69,9 @@ const (
 	TokenRightParen         // )
 	TokenLeftBracket        // [
 	TokenRightBracket       // ]
+	TokenLeftCurlyBrace     // {
+	TokenRightCurlyBrace    // }
+	TokenColon              // :
 	TokenComma              // ,
 )
 
@@ -130,10 +133,38 @@ func (k TokenKind) String() string {
 		return "["
 	case TokenRightBracket:
 		return "]"
+	case TokenLeftCurlyBrace:
+		return "{"
+	case TokenRightCurlyBrace:
+		return "}"
+	case TokenColon:
+		return ":"
 	case TokenComma:
 		return ","
 	default:
 		return fmt.Sprintf("unknown[%d]", k)
+	}
+}
+
+// MatchingDelimiter returns the counterpart of a delimiter token kind, e.g.
+// TokenRightParen for TokenLeftParen and vice versa. ok is false if k is not
+// one of '(', ')', '[', ']', '{' or '}'.
+func (k TokenKind) MatchingDelimiter() (match TokenKind, ok bool) {
+	switch k {
+	case TokenLeftParen:
+		return TokenRightParen, true
+	case TokenRightParen:
+		return TokenLeftParen, true
+	case TokenLeftBracket:
+		return TokenRightBracket, true
+	case TokenRightBracket:
+		return TokenLeftBracket, true
+	case TokenLeftCurlyBrace:
+		return TokenRightCurlyBrace, true
+	case TokenRightCurlyBrace:
+		return TokenLeftCurlyBrace, true
+	default:
+		return TokenEOF, false
 	}
 }
 

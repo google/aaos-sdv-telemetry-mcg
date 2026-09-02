@@ -169,6 +169,79 @@ func TestLexer_TokensAndSpans(t *testing.T) {
 				},
 			},
 		},
+		{
+			name:  "inline_message_builder",
+			input: "{ foo: 42, bar: true }",
+			want: []expressions.Token{
+				{
+					Kind: expressions.TokenLeftCurlyBrace,
+					Span: expressions.Span{
+						Start: expressions.Position{Line: 1, Column: 1, Offset: 0},
+						End:   expressions.Position{Line: 1, Column: 2, Offset: 1},
+					},
+				},
+				{
+					Kind:  expressions.TokenIdentifier,
+					Value: "foo",
+					Span: expressions.Span{
+						Start: expressions.Position{Line: 1, Column: 3, Offset: 2},
+						End:   expressions.Position{Line: 1, Column: 6, Offset: 5},
+					},
+				},
+				{
+					Kind: expressions.TokenColon,
+					Span: expressions.Span{
+						Start: expressions.Position{Line: 1, Column: 6, Offset: 5},
+						End:   expressions.Position{Line: 1, Column: 7, Offset: 6},
+					},
+				},
+				{
+					Kind:  expressions.TokenNumber,
+					Value: big.NewInt(42),
+					Span: expressions.Span{
+						Start: expressions.Position{Line: 1, Column: 8, Offset: 7},
+						End:   expressions.Position{Line: 1, Column: 10, Offset: 9},
+					},
+				},
+				{
+					Kind: expressions.TokenComma,
+					Span: expressions.Span{
+						Start: expressions.Position{Line: 1, Column: 10, Offset: 9},
+						End:   expressions.Position{Line: 1, Column: 11, Offset: 10},
+					},
+				},
+				{
+					Kind:  expressions.TokenIdentifier,
+					Value: "bar",
+					Span: expressions.Span{
+						Start: expressions.Position{Line: 1, Column: 12, Offset: 11},
+						End:   expressions.Position{Line: 1, Column: 15, Offset: 14},
+					},
+				},
+				{
+					Kind: expressions.TokenColon,
+					Span: expressions.Span{
+						Start: expressions.Position{Line: 1, Column: 15, Offset: 14},
+						End:   expressions.Position{Line: 1, Column: 16, Offset: 15},
+					},
+				},
+				{
+					Kind:  expressions.TokenBool,
+					Value: true,
+					Span: expressions.Span{
+						Start: expressions.Position{Line: 1, Column: 17, Offset: 16},
+						End:   expressions.Position{Line: 1, Column: 21, Offset: 20},
+					},
+				},
+				{
+					Kind: expressions.TokenRightCurlyBrace,
+					Span: expressions.Span{
+						Start: expressions.Position{Line: 1, Column: 22, Offset: 21},
+						End:   expressions.Position{Line: 1, Column: 23, Offset: 22},
+					},
+				},
+			},
+		},
 	}
 
 	for _, tc := range testCases {
@@ -331,7 +404,7 @@ func TestLexer_TrailingWhitespaceInEOFSpan(t *testing.T) {
 }
 
 func TestLexer_Operators(t *testing.T) {
-	input := "+ - * / ** % == != > >= < <= && || ^ ! ( ) [ ] ,"
+	input := "+ - * / ** % == != > >= < <= && || ^ ! ( ) [ ] { } : ,"
 	stream, err := expressions.Lex(strings.NewReader(input))
 	if err != nil {
 		t.Fatalf("unexpected lex error: %v", err)
@@ -358,6 +431,9 @@ func TestLexer_Operators(t *testing.T) {
 		{Kind: expressions.TokenRightParen},
 		{Kind: expressions.TokenLeftBracket},
 		{Kind: expressions.TokenRightBracket},
+		{Kind: expressions.TokenLeftCurlyBrace},
+		{Kind: expressions.TokenRightCurlyBrace},
+		{Kind: expressions.TokenColon},
 		{Kind: expressions.TokenComma},
 	}
 

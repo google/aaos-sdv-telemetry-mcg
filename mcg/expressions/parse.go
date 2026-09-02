@@ -147,7 +147,10 @@ func (p *ParserShunt) compileOne(source string) (uint32, error) {
 	if err != nil {
 		return 0, mcgerrors.InvalidExpressionError(source, err)
 	}
+	return p.compileTokens(tokens, source)
+}
 
+func (p *ParserShunt) compileTokens(tokens []token, source string) (uint32, error) {
 	operandStack := make(stack[operand], 0, 8)
 	operatorStack := make(stack[Operator], 0, 8)
 	for i, tok := range tokens {
@@ -164,6 +167,10 @@ func (p *ParserShunt) compileOne(source string) (uint32, error) {
 			if pub == "" {
 				if i == 0 || !isOperand(tokens[i-1]) {
 					return 0, mcgerrors.InvalidExpressionError(source, fmt.Errorf("postfix field access must follow an expression"))
+				}
+				if prevNode, ok := tokens[i-1].(*pb.Node); ok && prevNode.GetMessageBuilderNode() != nil {
+					// We disallow direct field access for better syntactical clarity.
+					return 0, mcgerrors.InvalidExpressionError(source, fmt.Errorf("direct field access on message builder is not allowed; wrap in parentheses: \"({ ... }).%s\"", strings.Join(fields, ".")))
 				}
 				// Postfix field access acts as an operator with the same precedence as Subscript.
 				// We must collapse the operator stack for any operators with higher or equal precedence.
@@ -369,7 +376,14 @@ func (p *ParserShunt) handleRightParen(operandStack *stack[operand], operatorSta
 
 		if op == OperatorLeftParen {
 			if !foundOperator {
-				if operatorStack.isEmpty() || (!isFunctionLike(operatorStack.peek()) && !isUnaryOperator(operatorStack.peek())) {
+				isMsgBuilder := false
+				if !operandStack.isEmpty() {
+					top := operandStack.peek()
+					if !top.parenthesized && top.index < uint32(len(p.nodes)) && p.nodes[top.index].GetMessageBuilderNode() != nil {
+						isMsgBuilder = true
+					}
+				}
+				if !isMsgBuilder && (operatorStack.isEmpty() || (!isFunctionLike(operatorStack.peek()) && !isUnaryOperator(operatorStack.peek()))) {
 					return fmt.Errorf("Found redundant parentheses")
 				}
 			}
@@ -496,7 +510,10 @@ func (p *ParserShunt) tokenize(source string) ([]token, error) {
 	if err != nil {
 		return nil, err
 	}
+	return p.tokenizeStream(stream)
+}
 
+func (p *ParserShunt) tokenizeStream(stream *TokenStream) ([]token, error) {
 	var tokens []token
 	for !stream.IsEOF() {
 		tok := stream.Next()
@@ -513,8 +530,36 @@ func (p *ParserShunt) tokenize(source string) ([]token, error) {
 			} else {
 				tokens = append(tokens, tok.Value)
 			}
+		case TokenLeftCurlyBrace:
+			node, err := p.parseMessageBuilder(stream, "")
+			if err != nil {
+				return nil, err
+			}
+			if stream.Peek().Kind == TokenIdentifier && strings.HasPrefix(stream.Peek().Value.(string), ".") {
+				field := strings.TrimPrefix(stream.Peek().Value.(string), ".")
+				return nil, fmt.Errorf("direct field access on message builder is not allowed; wrap in parentheses: \"({ ... }).%s\"", field)
+			}
+			tokens = append(tokens, node)
+		case TokenRightCurlyBrace:
+			return nil, fmt.Errorf("found \"}\" without matching \"{\"")
+		case TokenColon:
+			return nil, fmt.Errorf("unexpected \":\"")
 		case TokenIdentifier:
 			ident := tok.Value.(string)
+			if ident == "new" && stream.Peek().Kind == TokenIdentifier && stream.Lookahead(1).Kind == TokenLeftCurlyBrace {
+				msgType := stream.Next().Value.(string)
+				stream.Next() // consume TokenLeftCurlyBrace
+				node, err := p.parseMessageBuilder(stream, msgType)
+				if err != nil {
+					return nil, err
+				}
+				if stream.Peek().Kind == TokenIdentifier && strings.HasPrefix(stream.Peek().Value.(string), ".") {
+					field := strings.TrimPrefix(stream.Peek().Value.(string), ".")
+					return nil, fmt.Errorf("direct field access on message builder is not allowed; wrap in parentheses: \"(new %s { ... }).%s\"", msgType, field)
+				}
+				tokens = append(tokens, node)
+				break
+			}
 			if ident == "timestamp" && stream.Peek().Kind == TokenLeftParen {
 				node, err := parseTimestampFunction(stream)
 				if err != nil {
@@ -627,6 +672,124 @@ func describeToken(tok Token) string {
 	default:
 		return fmt.Sprintf("%q", tok.Kind)
 	}
+}
+
+// parseMessageBuilder compiles an inline message builder into an expression node.
+func (p *ParserShunt) parseMessageBuilder(stream *TokenStream, messageType string) (*pb.Node, error) {
+	var assignments []*pb.MessageBuilderNode_FieldAssignment
+	seenFields := make(map[string]struct{})
+
+	for {
+		if stream.IsEOF() {
+			return nil, fmt.Errorf("found \"{\" without matching \"}\" in message builder")
+		}
+
+		if stream.Peek().Kind == TokenRightCurlyBrace {
+			stream.Next() // consume '}'
+			break
+		}
+
+		fieldTok := stream.Next()
+		if fieldTok.Kind != TokenIdentifier {
+			return nil, fmt.Errorf("invalid field assignment: expected field name identifier")
+		}
+		fieldName := fieldTok.Value.(string)
+		if strings.Contains(fieldName, ".") {
+			return nil, fmt.Errorf("field name %q in message builder cannot contain \".\"", fieldName)
+		}
+		if _, ok := seenFields[fieldName]; ok {
+			return nil, fmt.Errorf("duplicate field name %q in message builder", fieldName)
+		}
+		seenFields[fieldName] = struct{}{}
+
+		if colonTok := stream.Next(); colonTok.Kind != TokenColon {
+			return nil, fmt.Errorf("invalid field assignment %q: missing \":\"", fieldName)
+		}
+
+		// Collect the tokens of the field's expression, which ends at the first
+		// ',' or '}' that is not nested inside any (), [] or {}. Unmatched or
+		// mismatched closing delimiters are rejected right away, as they would
+		// otherwise lead to confusing errors (or a wrong split between fields).
+		var exprTokens []Token
+		var openDelimiters stack[TokenKind]
+
+	collectExpr:
+		for {
+			if stream.IsEOF() {
+				if !openDelimiters.isEmpty() {
+					opening := openDelimiters.peek()
+					closing, _ := opening.MatchingDelimiter()
+					return nil, fmt.Errorf("found %q without matching %q in expression for field %q", opening, closing, fieldName)
+				}
+				return nil, fmt.Errorf("found \"{\" without matching \"}\" in message builder")
+			}
+			switch tok := stream.Peek(); tok.Kind {
+			case TokenLeftParen, TokenLeftBracket, TokenLeftCurlyBrace:
+				openDelimiters.push(tok.Kind)
+			case TokenRightParen, TokenRightBracket, TokenRightCurlyBrace:
+				if openDelimiters.isEmpty() {
+					if tok.Kind == TokenRightCurlyBrace {
+						// End of the message builder.
+						break collectExpr
+					}
+					opening, _ := tok.Kind.MatchingDelimiter()
+					return nil, fmt.Errorf("found %q without matching %q in expression for field %q", tok.Kind, opening, fieldName)
+				}
+				if want, _ := openDelimiters.pop().MatchingDelimiter(); tok.Kind != want {
+					return nil, fmt.Errorf("found %q where %q was expected in expression for field %q", tok.Kind, want, fieldName)
+				}
+			case TokenComma:
+				if openDelimiters.isEmpty() {
+					break collectExpr
+				}
+			case TokenColon:
+				if openDelimiters.isEmpty() {
+					return nil, fmt.Errorf("unexpected \":\" in expression for field %q (missing \",\" between fields?)", fieldName)
+				}
+			}
+			exprTokens = append(exprTokens, stream.Next())
+		}
+
+		if len(exprTokens) == 0 {
+			return nil, fmt.Errorf("missing expression for field %q", fieldName)
+		}
+
+		subStream := NewTokenStream(exprTokens)
+		subTokens, err := p.tokenizeStream(subStream)
+		if err != nil {
+			return nil, err
+		}
+		nodeIndex, err := p.compileTokens(subTokens, "")
+		if err != nil {
+			return nil, err
+		}
+
+		fa := pb.MessageBuilderNode_FieldAssignment_builder{
+			FieldName:           proto.String(fieldName),
+			ExpressionNodeIndex: proto.Uint32(nodeIndex),
+		}.Build()
+		assignments = append(assignments, fa)
+
+		if stream.Peek().Kind == TokenComma {
+			stream.Next() // consume ','
+			if stream.Peek().Kind == TokenRightCurlyBrace {
+				stream.Next() // consume '}'
+				break
+			}
+		} else if stream.Peek().Kind == TokenRightCurlyBrace {
+			stream.Next() // consume '}'
+			break
+		} else {
+			return nil, fmt.Errorf("expected \",\" or \"}\" after field assignment in message builder")
+		}
+	}
+
+	builder := pb.MessageBuilderNode_builder{FieldAssignments: assignments}
+	if messageType != "" {
+		builder.MessageType = proto.String(messageType)
+	}
+
+	return pb.Node_builder{MessageBuilderNode: builder.Build()}.Build(), nil
 }
 
 // resolveBigInt converts the provided `*big.Int` to either int64, int32, or

@@ -202,6 +202,12 @@ func (l *lexer) scanOperator() (Token, error) {
 		return l.emit(TokenLeftBracket, pos), nil
 	case ']':
 		return l.emit(TokenRightBracket, pos), nil
+	case '{':
+		return l.emit(TokenLeftCurlyBrace, pos), nil
+	case '}':
+		return l.emit(TokenRightCurlyBrace, pos), nil
+	case ':':
+		return l.emit(TokenColon, pos), nil
 	case ',':
 		return l.emit(TokenComma, pos), nil
 	case '*':

@@ -1694,6 +1694,26 @@ func TestShuntParseEdgeCases(t *testing.T) {
 			expression:  "12345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890",
 			expectError: "01234567890 is too large to fit into any numeric type",
 		},
+		{
+			name:        "stray_closing_curly_brace",
+			expression:  "1 + 2}",
+			expectError: "FAILED_PRECONDITION: Failed to parse expression \"1 + 2}\": found \"}\" without matching \"{\"",
+		},
+		{
+			name:        "stray_colon",
+			expression:  "1 : 2",
+			expectError: "FAILED_PRECONDITION: Failed to parse expression \"1 : 2\": unexpected \":\"",
+		},
+		{
+			name:        "unclosed_empty_curly_brace",
+			expression:  "{",
+			expectError: "FAILED_PRECONDITION: Failed to parse expression \"{\": found \"{\" without matching \"}\" in message builder",
+		},
+		{
+			name:        "unclosed_curly_brace",
+			expression:  "{ a: 1",
+			expectError: "FAILED_PRECONDITION: Failed to parse expression \"{ a: 1\": found \"{\" without matching \"}\" in message builder",
+		},
 	}
 
 	for _, tc := range testCases {
@@ -2860,29 +2880,69 @@ func TestShuntParse_NestedFunctionCalls(t *testing.T) {
 }
 
 func TestShuntParse_MatchedDelimiters(t *testing.T) {
-	// abs(a[5] + 6)
-	p := expressions.NewParserShunt(false, false)
-	sess := map[uint32]expressions.Text{1: {Uncompiled: "abs(a[5] + 6)"}}
-	rootIndices, nodes, err := p.CompileAll(sess)
-	if err != nil {
-		t.Fatalf("unexpected compile error: %v", err)
-	}
-	if rootIndices[1] != 5 {
-		t.Errorf("expected root index 5, got %d", rootIndices[1])
-	}
+	t.Run("parens_and_brackets", func(t *testing.T) {
+		// abs(a[5] + 6)
+		p := expressions.NewParserShunt(false, false)
+		sess := map[uint32]expressions.Text{1: {Uncompiled: "abs(a[5] + 6)"}}
+		rootIndices, nodes, err := p.CompileAll(sess)
+		if err != nil {
+			t.Fatalf("unexpected compile error: %v", err)
+		}
+		if rootIndices[1] != 5 {
+			t.Errorf("expected root index 5, got %d", rootIndices[1])
+		}
 
-	expectNodes := []*pb.Node{
-		pb.Node_builder{FieldLeafNode: pb.FieldLeafNode_builder{SourceName: "a"}.Build()}.Build(),
-		pb.Node_builder{ConstantLeafNode: pb.ConstantLeafNode_builder{Int32Value: proto.Int32(5)}.Build()}.Build(),
-		pb.Node_builder{CombinationNode: pb.CombinationNode_builder{LeftIndex: proto.Uint32(0), RightIndex: proto.Uint32(1), ListOperator: pb.CombinationNode_SUBSCRIPT.Enum()}.Build()}.Build(),
-		pb.Node_builder{ConstantLeafNode: pb.ConstantLeafNode_builder{Int32Value: proto.Int32(6)}.Build()}.Build(),
-		pb.Node_builder{CombinationNode: pb.CombinationNode_builder{LeftIndex: proto.Uint32(2), RightIndex: proto.Uint32(3), ArithmeticOperator: pb.CombinationNode_ADD.Enum()}.Build()}.Build(),
-		pb.Node_builder{CombinationNode: pb.CombinationNode_builder{LeftIndex: proto.Uint32(4), ArithmeticOperator: pb.CombinationNode_ABSOLUTE.Enum()}.Build()}.Build(),
-	}
+		expectNodes := []*pb.Node{
+			pb.Node_builder{FieldLeafNode: pb.FieldLeafNode_builder{SourceName: "a"}.Build()}.Build(),
+			pb.Node_builder{ConstantLeafNode: pb.ConstantLeafNode_builder{Int32Value: proto.Int32(5)}.Build()}.Build(),
+			pb.Node_builder{CombinationNode: pb.CombinationNode_builder{LeftIndex: proto.Uint32(0), RightIndex: proto.Uint32(1), ListOperator: pb.CombinationNode_SUBSCRIPT.Enum()}.Build()}.Build(),
+			pb.Node_builder{ConstantLeafNode: pb.ConstantLeafNode_builder{Int32Value: proto.Int32(6)}.Build()}.Build(),
+			pb.Node_builder{CombinationNode: pb.CombinationNode_builder{LeftIndex: proto.Uint32(2), RightIndex: proto.Uint32(3), ArithmeticOperator: pb.CombinationNode_ADD.Enum()}.Build()}.Build(),
+			pb.Node_builder{CombinationNode: pb.CombinationNode_builder{LeftIndex: proto.Uint32(4), ArithmeticOperator: pb.CombinationNode_ABSOLUTE.Enum()}.Build()}.Build(),
+		}
 
-	if diff := cmp.Diff(expectNodes, nodes, protocmp.Transform()); diff != "" {
-		t.Errorf("mismatch (-want +got):\n%s", diff)
-	}
+		if diff := cmp.Diff(expectNodes, nodes, protocmp.Transform()); diff != "" {
+			t.Errorf("mismatch (-want +got):\n%s", diff)
+		}
+	})
+
+	t.Run("nested_parens_brackets_and_curly_braces", func(t *testing.T) {
+		// abs(({ a: a[5] + 6 }).a)
+		p := expressions.NewParserShunt(true, false)
+		sess := map[uint32]expressions.Text{1: {Uncompiled: "abs(({ a: a[5] + 6 }).a)"}}
+		rootIndices, nodes, err := p.CompileAll(sess)
+		if err != nil {
+			t.Fatalf("unexpected compile error: %v", err)
+		}
+		if rootIndices[1] != 7 {
+			t.Errorf("expected root index 7, got %d", rootIndices[1])
+		}
+
+		expectNodes := []*pb.Node{
+			pb.Node_builder{FieldLeafNode: pb.FieldLeafNode_builder{SourceName: "a"}.Build()}.Build(),
+			pb.Node_builder{ConstantLeafNode: pb.ConstantLeafNode_builder{Int32Value: proto.Int32(5)}.Build()}.Build(),
+			pb.Node_builder{CombinationNode: pb.CombinationNode_builder{LeftIndex: proto.Uint32(0), RightIndex: proto.Uint32(1), ListOperator: pb.CombinationNode_SUBSCRIPT.Enum()}.Build()}.Build(),
+			pb.Node_builder{ConstantLeafNode: pb.ConstantLeafNode_builder{Int32Value: proto.Int32(6)}.Build()}.Build(),
+			pb.Node_builder{CombinationNode: pb.CombinationNode_builder{LeftIndex: proto.Uint32(2), RightIndex: proto.Uint32(3), ArithmeticOperator: pb.CombinationNode_ADD.Enum()}.Build()}.Build(),
+			pb.Node_builder{MessageBuilderNode: pb.MessageBuilderNode_builder{
+				FieldAssignments: []*pb.MessageBuilderNode_FieldAssignment{
+					pb.MessageBuilderNode_FieldAssignment_builder{
+						FieldName:           proto.String("a"),
+						ExpressionNodeIndex: proto.Uint32(4),
+					}.Build(),
+				},
+			}.Build()}.Build(),
+			pb.Node_builder{FieldLeafNode: pb.FieldLeafNode_builder{
+				ExpressionNodeIndex: proto.Uint32(5),
+				FieldNames:          []string{"a"},
+			}.Build()}.Build(),
+			pb.Node_builder{CombinationNode: pb.CombinationNode_builder{LeftIndex: proto.Uint32(6), ArithmeticOperator: pb.CombinationNode_ABSOLUTE.Enum()}.Build()}.Build(),
+		}
+
+		if diff := cmp.Diff(expectNodes, nodes, protocmp.Transform()); diff != "" {
+			t.Errorf("mismatch (-want +got):\n%s", diff)
+		}
+	})
 }
 
 func TestShuntParse_MismatchedDelimiters(t *testing.T) {
@@ -2925,6 +2985,26 @@ func TestShuntParse_MismatchedDelimiters(t *testing.T) {
 			name:        "function_paren_closed_with_bracket_followed_by_tokens",
 			expression:  "abs(1] bla)",
 			expectError: "Found \"]\" without matching \"[\"",
+		},
+		{
+			name:        "paren_closed_with_curly_brace",
+			expression:  "(1 + 2}",
+			expectError: "found \"}\" without matching \"{\"",
+		},
+		{
+			name:        "bracket_closed_with_curly_brace",
+			expression:  "source[0}",
+			expectError: "found \"}\" without matching \"{\"",
+		},
+		{
+			name:        "curly_brace_closed_with_paren",
+			expression:  "{ a: 1 )",
+			expectError: "found \")\" without matching \"(\" in expression for field \"a\"",
+		},
+		{
+			name:        "curly_brace_closed_with_bracket",
+			expression:  "{ a: 1 ]",
+			expectError: "found \"]\" without matching \"[\" in expression for field \"a\"",
 		},
 	}
 
@@ -3353,6 +3433,415 @@ func TestShuntParse_RightAssociativeExponentiation(t *testing.T) {
 		}
 		if diff := cmp.Diff(expectNodes, nodes, protocmp.Transform()); diff != "" {
 			t.Errorf("mismatch (-want +got):\n%s", diff)
+		}
+	})
+}
+
+func TestShuntParseMessageBuilder(t *testing.T) {
+	t.Run("ast_verification", func(t *testing.T) {
+		cases := []struct {
+			name        string
+			expression  string
+			expectRoot  uint32
+			expectNodes []*pb.Node
+		}{
+			{
+				name:       "inline_with_type",
+				expression: "new com.example.MyMessage { field_1: 1 + 2, field_2: true }",
+				expectRoot: 4,
+				expectNodes: []*pb.Node{
+					pb.Node_builder{ConstantLeafNode: pb.ConstantLeafNode_builder{Int32Value: proto.Int32(1)}.Build()}.Build(),
+					pb.Node_builder{ConstantLeafNode: pb.ConstantLeafNode_builder{Int32Value: proto.Int32(2)}.Build()}.Build(),
+					pb.Node_builder{CombinationNode: pb.CombinationNode_builder{LeftIndex: proto.Uint32(0), RightIndex: proto.Uint32(1), ArithmeticOperator: pb.CombinationNode_ADD.Enum()}.Build()}.Build(),
+					pb.Node_builder{ConstantLeafNode: pb.ConstantLeafNode_builder{BoolValue: proto.Bool(true)}.Build()}.Build(),
+					pb.Node_builder{MessageBuilderNode: pb.MessageBuilderNode_builder{
+						MessageType: proto.String("com.example.MyMessage"),
+						FieldAssignments: []*pb.MessageBuilderNode_FieldAssignment{
+							pb.MessageBuilderNode_FieldAssignment_builder{FieldName: proto.String("field_1"), ExpressionNodeIndex: proto.Uint32(2)}.Build(),
+							pb.MessageBuilderNode_FieldAssignment_builder{FieldName: proto.String("field_2"), ExpressionNodeIndex: proto.Uint32(3)}.Build(),
+						},
+					}.Build()}.Build(),
+				},
+			},
+			{
+				name:       "inline_without_type",
+				expression: "{ a: 10, b: 20.5 }",
+				expectRoot: 2,
+				expectNodes: []*pb.Node{
+					pb.Node_builder{ConstantLeafNode: pb.ConstantLeafNode_builder{Int32Value: proto.Int32(10)}.Build()}.Build(),
+					pb.Node_builder{ConstantLeafNode: pb.ConstantLeafNode_builder{FloatValue: proto.Float32(20.5)}.Build()}.Build(),
+					pb.Node_builder{MessageBuilderNode: pb.MessageBuilderNode_builder{
+						FieldAssignments: []*pb.MessageBuilderNode_FieldAssignment{
+							pb.MessageBuilderNode_FieldAssignment_builder{FieldName: proto.String("a"), ExpressionNodeIndex: proto.Uint32(0)}.Build(),
+							pb.MessageBuilderNode_FieldAssignment_builder{FieldName: proto.String("b"), ExpressionNodeIndex: proto.Uint32(1)}.Build(),
+						},
+					}.Build()}.Build(),
+				},
+			},
+			{
+				name:       "nested_inline",
+				expression: "new com.example.Outer { inner: { x: 1 }, val: 42 }",
+				expectRoot: 3,
+				expectNodes: []*pb.Node{
+					pb.Node_builder{ConstantLeafNode: pb.ConstantLeafNode_builder{Int32Value: proto.Int32(1)}.Build()}.Build(),
+					pb.Node_builder{MessageBuilderNode: pb.MessageBuilderNode_builder{
+						FieldAssignments: []*pb.MessageBuilderNode_FieldAssignment{
+							pb.MessageBuilderNode_FieldAssignment_builder{FieldName: proto.String("x"), ExpressionNodeIndex: proto.Uint32(0)}.Build(),
+						},
+					}.Build()}.Build(),
+					pb.Node_builder{ConstantLeafNode: pb.ConstantLeafNode_builder{Int32Value: proto.Int32(42)}.Build()}.Build(),
+					pb.Node_builder{MessageBuilderNode: pb.MessageBuilderNode_builder{
+						MessageType: proto.String("com.example.Outer"),
+						FieldAssignments: []*pb.MessageBuilderNode_FieldAssignment{
+							pb.MessageBuilderNode_FieldAssignment_builder{FieldName: proto.String("inner"), ExpressionNodeIndex: proto.Uint32(1)}.Build(),
+							pb.MessageBuilderNode_FieldAssignment_builder{FieldName: proto.String("val"), ExpressionNodeIndex: proto.Uint32(2)}.Build(),
+						},
+					}.Build()}.Build(),
+				},
+			},
+			{
+				name:       "postfix_field_access_on_builder",
+				expression: "({ a: 1 }).a == 1",
+				expectRoot: 3,
+				expectNodes: []*pb.Node{
+					pb.Node_builder{ConstantLeafNode: pb.ConstantLeafNode_builder{Int32Value: proto.Int32(1)}.Build()}.Build(),
+					pb.Node_builder{MessageBuilderNode: pb.MessageBuilderNode_builder{
+						FieldAssignments: []*pb.MessageBuilderNode_FieldAssignment{
+							pb.MessageBuilderNode_FieldAssignment_builder{FieldName: proto.String("a"), ExpressionNodeIndex: proto.Uint32(0)}.Build(),
+						},
+					}.Build()}.Build(),
+					pb.Node_builder{FieldLeafNode: pb.FieldLeafNode_builder{
+						ExpressionNodeIndex: proto.Uint32(1),
+						FieldNames:          []string{"a"},
+					}.Build()}.Build(),
+					pb.Node_builder{CombinationNode: pb.CombinationNode_builder{
+						LeftIndex:          proto.Uint32(2),
+						RightIndex:         proto.Uint32(0),
+						RelationalOperator: pb.CombinationNode_EQ.Enum(),
+					}.Build()}.Build(),
+				},
+			},
+			{
+				name:       "chained_postfix_on_nested_builder",
+				expression: "({ a: { b: 42 } }).a.b == 42",
+				expectRoot: 4,
+				expectNodes: []*pb.Node{
+					pb.Node_builder{ConstantLeafNode: pb.ConstantLeafNode_builder{Int32Value: proto.Int32(42)}.Build()}.Build(),
+					pb.Node_builder{MessageBuilderNode: pb.MessageBuilderNode_builder{
+						FieldAssignments: []*pb.MessageBuilderNode_FieldAssignment{
+							pb.MessageBuilderNode_FieldAssignment_builder{FieldName: proto.String("b"), ExpressionNodeIndex: proto.Uint32(0)}.Build(),
+						},
+					}.Build()}.Build(),
+					pb.Node_builder{MessageBuilderNode: pb.MessageBuilderNode_builder{
+						FieldAssignments: []*pb.MessageBuilderNode_FieldAssignment{
+							pb.MessageBuilderNode_FieldAssignment_builder{FieldName: proto.String("a"), ExpressionNodeIndex: proto.Uint32(1)}.Build(),
+						},
+					}.Build()}.Build(),
+					pb.Node_builder{FieldLeafNode: pb.FieldLeafNode_builder{
+						ExpressionNodeIndex: proto.Uint32(2),
+						FieldNames:          []string{"a", "b"},
+					}.Build()}.Build(),
+					pb.Node_builder{CombinationNode: pb.CombinationNode_builder{
+						LeftIndex:          proto.Uint32(3),
+						RightIndex:         proto.Uint32(0),
+						RelationalOperator: pb.CombinationNode_EQ.Enum(),
+					}.Build()}.Build(),
+				},
+			},
+			{
+				name:       "builder_inside_arithmetic",
+				expression: "({ a: 1 }).a + ({ b: 2 }).b",
+				expectRoot: 6,
+				expectNodes: []*pb.Node{
+					pb.Node_builder{ConstantLeafNode: pb.ConstantLeafNode_builder{Int32Value: proto.Int32(1)}.Build()}.Build(),
+					pb.Node_builder{ConstantLeafNode: pb.ConstantLeafNode_builder{Int32Value: proto.Int32(2)}.Build()}.Build(),
+					pb.Node_builder{MessageBuilderNode: pb.MessageBuilderNode_builder{
+						FieldAssignments: []*pb.MessageBuilderNode_FieldAssignment{
+							pb.MessageBuilderNode_FieldAssignment_builder{FieldName: proto.String("a"), ExpressionNodeIndex: proto.Uint32(0)}.Build(),
+						},
+					}.Build()}.Build(),
+					pb.Node_builder{FieldLeafNode: pb.FieldLeafNode_builder{
+						ExpressionNodeIndex: proto.Uint32(2),
+						FieldNames:          []string{"a"},
+					}.Build()}.Build(),
+					pb.Node_builder{MessageBuilderNode: pb.MessageBuilderNode_builder{
+						FieldAssignments: []*pb.MessageBuilderNode_FieldAssignment{
+							pb.MessageBuilderNode_FieldAssignment_builder{FieldName: proto.String("b"), ExpressionNodeIndex: proto.Uint32(1)}.Build(),
+						},
+					}.Build()}.Build(),
+					pb.Node_builder{FieldLeafNode: pb.FieldLeafNode_builder{
+						ExpressionNodeIndex: proto.Uint32(4),
+						FieldNames:          []string{"b"},
+					}.Build()}.Build(),
+					pb.Node_builder{CombinationNode: pb.CombinationNode_builder{
+						LeftIndex:          proto.Uint32(3),
+						RightIndex:         proto.Uint32(5),
+						ArithmeticOperator: pb.CombinationNode_ADD.Enum(),
+					}.Build()}.Build(),
+				},
+			},
+			{
+				name:       "builder_inside_function",
+				expression: "abs(({ a: 5 }).a)",
+				expectRoot: 3,
+				expectNodes: []*pb.Node{
+					pb.Node_builder{ConstantLeafNode: pb.ConstantLeafNode_builder{Int32Value: proto.Int32(5)}.Build()}.Build(),
+					pb.Node_builder{MessageBuilderNode: pb.MessageBuilderNode_builder{
+						FieldAssignments: []*pb.MessageBuilderNode_FieldAssignment{
+							pb.MessageBuilderNode_FieldAssignment_builder{FieldName: proto.String("a"), ExpressionNodeIndex: proto.Uint32(0)}.Build(),
+						},
+					}.Build()}.Build(),
+					pb.Node_builder{FieldLeafNode: pb.FieldLeafNode_builder{
+						ExpressionNodeIndex: proto.Uint32(1),
+						FieldNames:          []string{"a"},
+					}.Build()}.Build(),
+					pb.Node_builder{CombinationNode: pb.CombinationNode_builder{
+						LeftIndex:          proto.Uint32(2),
+						ArithmeticOperator: pb.CombinationNode_ABSOLUTE.Enum(),
+					}.Build()}.Build(),
+				},
+			},
+			{
+				name:       "trailing_comma",
+				expression: "{ a: 1, b: 2, }",
+				expectRoot: 2,
+				expectNodes: []*pb.Node{
+					pb.Node_builder{ConstantLeafNode: pb.ConstantLeafNode_builder{Int32Value: proto.Int32(1)}.Build()}.Build(),
+					pb.Node_builder{ConstantLeafNode: pb.ConstantLeafNode_builder{Int32Value: proto.Int32(2)}.Build()}.Build(),
+					pb.Node_builder{MessageBuilderNode: pb.MessageBuilderNode_builder{
+						FieldAssignments: []*pb.MessageBuilderNode_FieldAssignment{
+							pb.MessageBuilderNode_FieldAssignment_builder{FieldName: proto.String("a"), ExpressionNodeIndex: proto.Uint32(0)}.Build(),
+							pb.MessageBuilderNode_FieldAssignment_builder{FieldName: proto.String("b"), ExpressionNodeIndex: proto.Uint32(1)}.Build(),
+						},
+					}.Build()}.Build(),
+				},
+			},
+			{
+				name:       "standalone_parenthesized_builder",
+				expression: "({ a: 10 })",
+				expectRoot: 1,
+				expectNodes: []*pb.Node{
+					pb.Node_builder{ConstantLeafNode: pb.ConstantLeafNode_builder{Int32Value: proto.Int32(10)}.Build()}.Build(),
+					pb.Node_builder{MessageBuilderNode: pb.MessageBuilderNode_builder{
+						FieldAssignments: []*pb.MessageBuilderNode_FieldAssignment{
+							pb.MessageBuilderNode_FieldAssignment_builder{FieldName: proto.String("a"), ExpressionNodeIndex: proto.Uint32(0)}.Build(),
+						},
+					}.Build()}.Build(),
+				},
+			},
+			{
+				name:       "empty_builder",
+				expression: "{}",
+				expectRoot: 0,
+				expectNodes: []*pb.Node{
+					pb.Node_builder{MessageBuilderNode: pb.MessageBuilderNode_builder{}.Build()}.Build(),
+				},
+			},
+			{
+				name:       "empty_builder_with_type",
+				expression: "new com.example.MyMessage {}",
+				expectRoot: 0,
+				expectNodes: []*pb.Node{
+					pb.Node_builder{MessageBuilderNode: pb.MessageBuilderNode_builder{
+						MessageType: proto.String("com.example.MyMessage"),
+					}.Build()}.Build(),
+				},
+			},
+			{
+				name:       "empty_builder_parenthesized",
+				expression: "({})",
+				expectRoot: 0,
+				expectNodes: []*pb.Node{
+					pb.Node_builder{MessageBuilderNode: pb.MessageBuilderNode_builder{}.Build()}.Build(),
+				},
+			},
+			{
+				name:       "empty_builder_parenthesized_with_type",
+				expression: "(new com.example.MyMessage {})",
+				expectRoot: 0,
+				expectNodes: []*pb.Node{
+					pb.Node_builder{MessageBuilderNode: pb.MessageBuilderNode_builder{
+						MessageType: proto.String("com.example.MyMessage"),
+					}.Build()}.Build(),
+				},
+			},
+			{
+				name:       "nested_empty_builder",
+				expression: "{ a: {} }",
+				expectRoot: 1,
+				expectNodes: []*pb.Node{
+					pb.Node_builder{MessageBuilderNode: pb.MessageBuilderNode_builder{}.Build()}.Build(),
+					pb.Node_builder{MessageBuilderNode: pb.MessageBuilderNode_builder{
+						FieldAssignments: []*pb.MessageBuilderNode_FieldAssignment{
+							pb.MessageBuilderNode_FieldAssignment_builder{FieldName: proto.String("a"), ExpressionNodeIndex: proto.Uint32(0)}.Build(),
+						},
+					}.Build()}.Build(),
+				},
+			},
+		}
+
+		for _, tc := range cases {
+			t.Run(tc.name, func(t *testing.T) {
+				sess := map[uint32]expressions.Text{
+					1: {Uncompiled: tc.expression},
+				}
+				p := expressions.NewParserShunt(true, false)
+				rootIndices, nodes, err := p.CompileAll(sess)
+				if err != nil {
+					t.Fatalf("CompileAll(%q) unexpected error: %v", tc.expression, err)
+				}
+				if rootIndices[1] != tc.expectRoot {
+					t.Errorf("expected root index %d, got %d", tc.expectRoot, rootIndices[1])
+				}
+				if diff := cmp.Diff(tc.expectNodes, nodes, protocmp.Transform()); diff != "" {
+					t.Errorf("mismatch (-want +got):\n%s", diff)
+				}
+			})
+		}
+	})
+
+	t.Run("error_cases", func(t *testing.T) {
+		errorCases := []struct {
+			name        string
+			expression  string
+			expectError string
+		}{
+			{
+				name:        "duplicate_field_name",
+				expression:  "{ a: 1, a: 2 }",
+				expectError: "duplicate field name \"a\" in message builder",
+			},
+			{
+				name:        "missing_colon",
+				expression:  "{ a 1, b: 2 }",
+				expectError: "invalid field assignment \"a\": missing \":\"",
+			},
+			{
+				name:        "missing_field_name",
+				expression:  "{ : 1 }",
+				expectError: "invalid field assignment: expected field name identifier",
+			},
+			{
+				name:        "missing_expression",
+				expression:  "{ a: }",
+				expectError: "missing expression for field \"a\"",
+			},
+			{
+				name:        "unclosed_brace",
+				expression:  "{ a: 1",
+				expectError: "found \"{\" without matching \"}\" in message builder",
+			},
+			{
+				name:        "unexpected_token_between_fields",
+				expression:  "{ a: 1 b: 2 }",
+				expectError: "unexpected \":\" in expression for field \"a\" (missing \",\" between fields?)",
+			},
+			{
+				name:        "new_without_type",
+				expression:  "new { a: 1 }",
+				expectError: "Found operand(s) but no operator",
+			},
+			{
+				name:        "direct_field_access_without_parens",
+				expression:  "{ a: 1 }.a",
+				expectError: "direct field access on message builder is not allowed; wrap in parentheses",
+			},
+			{
+				name:        "direct_field_access_with_type_without_parens",
+				expression:  "new com.example.MyMessage { a: 1 }.a",
+				expectError: "direct field access on message builder is not allowed; wrap in parentheses",
+			},
+			{
+				name:        "direct_field_access_nested_without_parens",
+				expression:  "({ a: { b: 1 }.b }).a",
+				expectError: "direct field access on message builder is not allowed; wrap in parentheses",
+			},
+			{
+				name:        "redundant_double_parens_around_builder",
+				expression:  "(({ a: 1 })).a",
+				expectError: "Found redundant parentheses",
+			},
+			{
+				name:        "field_name_with_dot",
+				expression:  "{ a.b: 1 }",
+				expectError: "field name \"a.b\" in message builder cannot contain \".\"",
+			},
+			{
+				name:        "leading_stray_closing_brace",
+				expression:  "}{ a: 10, b: 20.5 }",
+				expectError: "found \"}\" without matching \"{\"",
+			},
+			{
+				name:        "trailing_stray_closing_brace",
+				expression:  "{ a: 10, b: 20.5 }}",
+				expectError: "found \"}\" without matching \"{\"",
+			},
+			{
+				name:        "unmatched_closing_paren_in_field",
+				expression:  "{ a: 10), b: 2 }",
+				expectError: "found \")\" without matching \"(\" in expression for field \"a\"",
+			},
+			{
+				name:        "unmatched_closing_paren_after_function_call_in_field",
+				expression:  "{ a: abs(1)), b: 2 }",
+				expectError: "found \")\" without matching \"(\" in expression for field \"a\"",
+			},
+			{
+				name:        "unmatched_closing_bracket_in_field",
+				expression:  "{ a: 10] }",
+				expectError: "found \"]\" without matching \"[\" in expression for field \"a\"",
+			},
+			{
+				name:        "mismatched_paren_and_bracket_in_field",
+				expression:  "{ a: (1], b: 2 }",
+				expectError: "found \"]\" where \")\" was expected in expression for field \"a\"",
+			},
+			{
+				name:        "mismatched_bracket_and_brace_in_field",
+				expression:  "{ a: [{ b: 1 ], c: 2 }",
+				expectError: "found \"]\" where \"}\" was expected in expression for field \"a\"",
+			},
+			{
+				name:        "closing_paren_before_opening_paren_in_field",
+				expression:  "{ a: 1 )( , b: 2 }",
+				expectError: "found \")\" without matching \"(\" in expression for field \"a\"",
+			},
+			{
+				name:        "unclosed_paren_in_field",
+				expression:  "{ a: (1 }",
+				expectError: "found \"}\" where \")\" was expected in expression for field \"a\"",
+			},
+			{
+				name:        "unclosed_paren_in_field_at_eof",
+				expression:  "{ a: (1",
+				expectError: "found \"(\" without matching \")\" in expression for field \"a\"",
+			},
+			{
+				name:        "unclosed_nested_delimiters_in_field_at_eof_reports_innermost",
+				expression:  "{ a: [(1",
+				expectError: "found \"(\" without matching \")\" in expression for field \"a\"",
+			},
+			{
+				name:        "unclosed_nested_builder_in_field_at_eof",
+				expression:  "{ a: { b: 1",
+				expectError: "found \"{\" without matching \"}\" in expression for field \"a\"",
+			},
+		}
+
+		for _, tc := range errorCases {
+			t.Run(tc.name, func(t *testing.T) {
+				sess := map[uint32]expressions.Text{
+					1: {Uncompiled: tc.expression},
+				}
+				p := expressions.NewParserShunt(true, false)
+				_, _, err := p.CompileAll(sess)
+				if err == nil {
+					t.Fatalf("expected error for %q, got success", tc.expression)
+				}
+				if !strings.Contains(err.Error(), tc.expectError) {
+					t.Errorf("For expression %q, expected error containing %q, but got %q", tc.expression, tc.expectError, err.Error())
+				}
+			})
 		}
 	})
 }

@@ -102,6 +102,9 @@ func TestTokenKind_String(t *testing.T) {
 		{name: "plus", kind: expressions.TokenPlus, want: "+"},
 		{name: "starstar", kind: expressions.TokenStarStar, want: "**"},
 		{name: "comma", kind: expressions.TokenComma, want: ","},
+		{name: "leftCurlyBrace", kind: expressions.TokenLeftCurlyBrace, want: "{"},
+		{name: "rightCurlyBrace", kind: expressions.TokenRightCurlyBrace, want: "}"},
+		{name: "colon", kind: expressions.TokenColon, want: ":"},
 		{name: "unknown", kind: expressions.TokenKind(999), want: "unknown[999]"},
 	}
 
@@ -110,6 +113,34 @@ func TestTokenKind_String(t *testing.T) {
 			got := tc.kind.String()
 			if got != tc.want {
 				t.Errorf("kind.String() = %q, want %q", got, tc.want)
+			}
+		})
+	}
+}
+
+func TestTokenKind_MatchingDelimiter(t *testing.T) {
+	tests := []struct {
+		kind      expressions.TokenKind
+		wantMatch expressions.TokenKind
+		wantOK    bool
+	}{
+		{kind: expressions.TokenLeftParen, wantMatch: expressions.TokenRightParen, wantOK: true},
+		{kind: expressions.TokenRightParen, wantMatch: expressions.TokenLeftParen, wantOK: true},
+		{kind: expressions.TokenLeftBracket, wantMatch: expressions.TokenRightBracket, wantOK: true},
+		{kind: expressions.TokenRightBracket, wantMatch: expressions.TokenLeftBracket, wantOK: true},
+		{kind: expressions.TokenLeftCurlyBrace, wantMatch: expressions.TokenRightCurlyBrace, wantOK: true},
+		{kind: expressions.TokenRightCurlyBrace, wantMatch: expressions.TokenLeftCurlyBrace, wantOK: true},
+		{kind: expressions.TokenComma, wantMatch: expressions.TokenEOF, wantOK: false},
+		{kind: expressions.TokenColon, wantMatch: expressions.TokenEOF, wantOK: false},
+		{kind: expressions.TokenEOF, wantMatch: expressions.TokenEOF, wantOK: false},
+		{kind: expressions.TokenKind(999), wantMatch: expressions.TokenEOF, wantOK: false},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.kind.String(), func(t *testing.T) {
+			gotMatch, gotOK := tc.kind.MatchingDelimiter()
+			if gotMatch != tc.wantMatch || gotOK != tc.wantOK {
+				t.Errorf("%v.MatchingDelimiter() = (%v, %t), want (%v, %t)", tc.kind, gotMatch, gotOK, tc.wantMatch, tc.wantOK)
 			}
 		})
 	}
