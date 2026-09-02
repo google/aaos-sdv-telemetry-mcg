@@ -85,6 +85,9 @@ type Session struct {
 
 	// EnableRightAssociativeExponentiation controls whether the exponentiation operator (**) is right-associative.
 	EnableRightAssociativeExponentiation bool
+
+	// MessageBuilderNodeSupported controls whether inline object construction is permitted. Defaults to true.
+	MessageBuilderNodeSupported bool
 }
 
 // Save an expression into the session using a session-scoped expression ID.

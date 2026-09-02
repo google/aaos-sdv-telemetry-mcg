@@ -144,15 +144,16 @@ func (req *MetricsConfigRequest) ValidateSchemaConsistency(apiVersion constants.
 
 func (req *MetricsConfigRequest) ToSession(ctx context.Context) (*session.Session, []*mcgerrors.StatusError) {
 	sess := &session.Session{
-		Sources:                    make(map[string]*pb.Source),
-		Triggers:                   make(map[string]*pb.Trigger),
-		ReportConfigs:              make(map[string]*pb.MetricsReportConfig),
-		Expressions:                make(map[uint32]expressions.Text),
-		NextUncompiledExpressionID: 1,
-		FieldTypes:                 make(map[session.FieldTypeLocation]string),
-		DataSourceMessageTypes:     make(map[string]string),
-		IgnoreValidations:          false,
-		NoMessageInference:         false,
+		Sources:                     make(map[string]*pb.Source),
+		Triggers:                    make(map[string]*pb.Trigger),
+		ReportConfigs:               make(map[string]*pb.MetricsReportConfig),
+		Expressions:                 make(map[uint32]expressions.Text),
+		NextUncompiledExpressionID:  1,
+		FieldTypes:                  make(map[session.FieldTypeLocation]string),
+		DataSourceMessageTypes:      make(map[string]string),
+		IgnoreValidations:           false,
+		NoMessageInference:          false,
+		MessageBuilderNodeSupported: true,
 	}
 
 	var errorList []*mcgerrors.StatusError

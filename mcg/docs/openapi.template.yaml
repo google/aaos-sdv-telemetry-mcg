@@ -63,6 +63,14 @@ paths:
         explode: true
         schema:
           type: boolean
+      - name: message_builder_node_supported
+        in: query
+        description: Allow inline object construction (MessageBuilderNode) in expressions (default true)
+        required: false
+        style: form
+        explode: true
+        schema:
+          type: boolean
       requestBody:
         description: Metrics config request
         content:
@@ -309,6 +317,14 @@ paths:
         explode: true
         schema:
           type: boolean
+      - name: message_builder_node_supported
+        in: query
+        description: Allow inline object construction (MessageBuilderNode) in expressions (default true)
+        required: false
+        style: form
+        explode: true
+        schema:
+          type: boolean
       requestBody:
         description: Metrics config request
         content:
@@ -382,6 +398,14 @@ paths:
       - name: return_config
         in: query
         description: Return MetricsConfig on successful validation
+        required: false
+        style: form
+        explode: true
+        schema:
+          type: boolean
+      - name: message_builder_node_supported
+        in: query
+        description: Allow inline object construction (MessageBuilderNode) in expressions (default true)
         required: false
         style: form
         explode: true

@@ -218,3 +218,14 @@ func TestMetricsConfigRetainAggregators(t *testing.T) {
 		})
 	}
 }
+
+func TestToSession_MessageBuilderNodeSupportedDefaultsToTrue(t *testing.T) {
+	req := &requests.MetricsConfigRequest{}
+	sess, errs := req.ToSession(context.Background())
+	if len(errs) > 0 {
+		t.Fatalf("req.ToSession() error = %v, want none", errs)
+	}
+	if got, want := sess.MessageBuilderNodeSupported, true; got != want {
+		t.Errorf("sess.MessageBuilderNodeSupported = %v, want %v", got, want)
+	}
+}

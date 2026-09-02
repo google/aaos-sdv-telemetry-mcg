@@ -96,6 +96,13 @@ func handleCompile(apiVersion constants.APIVersion) gin.HandlerFunc {
 		}
 		sess.EnableRightAssociativeExponentiation = enableRightAssociativeExp
 
+		messageBuilderNodeSupported, statusErr := getMessageBuilderNodeSupportedQueryParamValue(c)
+		if statusErr != nil {
+			c.Error(statusErr)
+			return
+		}
+		sess.MessageBuilderNodeSupported = messageBuilderNodeSupported
+
 		mc, errorList, errorMessage := compileSession(sess)
 		if len(errorList) > 0 {
 			c.JSON(http.StatusBadRequest, mcgerrors.FlattenErrorList(code.Code_INVALID_ARGUMENT, errorMessage, errorList))
@@ -124,6 +131,19 @@ func handleValidate(apiVersion constants.APIVersion) gin.HandlerFunc {
 		if err != nil {
 			c.Error(err)
 			return
+		}
+
+		messageBuilderNodeSupported, statusErr := getMessageBuilderNodeSupportedQueryParamValue(c)
+		if statusErr != nil {
+			c.Error(statusErr)
+			return
+		}
+
+		if !messageBuilderNodeSupported {
+			if errs := validateMessageBuilderNodesSupported(mc.GetExpressionNodes()); len(errs) > 0 {
+				c.JSON(http.StatusBadRequest, mcgerrors.FlattenErrorList(code.Code_INVALID_ARGUMENT, "Metrics config validation failed.", errs))
+				return
+			}
 		}
 
 		errorList := validators.ValidateWithShallowValidations(mc)

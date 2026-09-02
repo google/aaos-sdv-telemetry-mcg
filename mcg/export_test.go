@@ -15,9 +15,11 @@
 package mcg
 
 var (
-	ChooseRenderFunc              = chooseRenderFunc
-	TextprotoMarshal              = textprotoMarshal
-	ApplyCanonicalToLegacyRenames = applyCanonicalToLegacyRenames
-	ApplyLegacyToCanonicalRenames = applyLegacyToCanonicalRenames
-	ParseMetricsConfig            = parseMetricsConfig
+	ChooseRenderFunc                     = chooseRenderFunc
+	TextprotoMarshal                     = textprotoMarshal
+	ApplyCanonicalToLegacyRenames        = applyCanonicalToLegacyRenames
+	ApplyLegacyToCanonicalRenames        = applyLegacyToCanonicalRenames
+	ParseMetricsConfig                   = parseMetricsConfig
+	CompileSession                       = compileSession
+	ValidateMessageBuilderNodesSupported = validateMessageBuilderNodesSupported
 )

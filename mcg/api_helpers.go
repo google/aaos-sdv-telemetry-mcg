@@ -401,6 +401,12 @@ func compileSession(sess *session.Session) (*pb.MetricsConfig, []*mcgerrors.Stat
 		RetainAggregationsOnStop: sess.RetainAggregationsOnStop,
 	}.Build()
 
+	if !sess.MessageBuilderNodeSupported {
+		if errorList := validateMessageBuilderNodesSupported(mc.GetExpressionNodes()); len(errorList) > 0 {
+			return nil, errorList, "Validation failed."
+		}
+	}
+
 	if sess.NoMessageInference {
 		// Copy input descriptors verbatim when inference is skipped.
 		mc.SetDescriptorProtos(sess.InputDescriptors)
@@ -422,6 +428,17 @@ func compileSession(sess *session.Session) (*pb.MetricsConfig, []*mcgerrors.Stat
 	}
 
 	return mc, []*mcgerrors.StatusError{}, ""
+}
+
+// validateMessageBuilderNodesSupported checks if any MessageBuilderNode is present in nodes when unsupported.
+func validateMessageBuilderNodesSupported(nodes []*pb.Node) []*mcgerrors.StatusError {
+	var errs []*mcgerrors.StatusError
+	for idx, node := range nodes {
+		if node.GetMessageBuilderNode() != nil {
+			errs = append(errs, mcgerrors.InvalidArgument(fmt.Sprintf("expression_nodes[%d]: message_builder_node is not supported when message_builder_node_supported is false", idx)))
+		}
+	}
+	return errs
 }
 
 func getIgnoreValidationQueryParamValue(c *gin.Context) (bool, *mcgerrors.StatusError) {
@@ -453,6 +470,18 @@ func getEnableRightAssociativeExponentiationQueryParamValue(c *gin.Context) (boo
 	return getQueryParamBoolValue(c, "enable_right_associative_exponentiation")
 }
 
+// getMessageBuilderNodeSupportedQueryParamValue extracts the message_builder_node_supported query parameter, defaulting to true.
+func getMessageBuilderNodeSupportedQueryParamValue(c *gin.Context) (bool, *mcgerrors.StatusError) {
+	value, exists := c.GetQuery("message_builder_node_supported")
+	if !exists {
+		return true, nil
+	}
+	supported, err := strconv.ParseBool(value)
+	if err != nil {
+		return false, mcgerrors.InvalidArgument(fmt.Sprintf("Failed to parse boolean value from message_builder_node_supported=%s", value))
+	}
+	return supported, nil
+}
 func getReturnConfigQueryParamValue(c *gin.Context) (bool, *mcgerrors.StatusError) {
 	return getQueryParamBoolValue(c, "return_config")
 }

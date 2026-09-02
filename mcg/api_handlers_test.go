@@ -188,7 +188,8 @@ func fixtureTest(t *testing.T, apiVersion constants.APIVersion, jsonReq, textpro
 }
 
 func fixtureTestNoExpressions(t *testing.T, json, textproto string) {
-	fixtureTestCurrent(t, json, textproto,
+	fixtureTestCurrent(
+		t, json, textproto,
 		protocmp.IgnoreFields(&pb.MetricsConfig{}, protoreflect.Name("expression_nodes")),
 	)
 }
@@ -1476,5 +1477,238 @@ func TestGetFileDescriptorInvalidPayload(t *testing.T) {
 				}
 			})
 		}
+	}
+}
+
+func TestMessageBuilderNodeSupported_GenerateAPI(t *testing.T) {
+	ctx := context.Background()
+	router, _ := setupServer(ctx, t, false)
+
+	payloadWithoutMessageBuilderNode := `{
+		"report_configs": [{
+			"name": "report1",
+			"report_incomplete": true,
+			"message_builder": {
+				"message_type": ".google.protobuf.Int32Value",
+				"field_assignments": [{
+					"field_name": "value",
+					"aggregation": {
+						"@type": "none",
+						"expression": "42"
+					}
+				}]
+			}
+		}]
+	}`
+
+	payloadWithMessageBuilderNode := `{
+		"report_configs": [{
+			"name": "report1",
+			"report_incomplete": true,
+			"message_builder": {
+				"message_type": ".google.protobuf.Int32Value",
+				"field_assignments": [{
+					"field_name": "value",
+					"aggregation": {
+						"@type": "none",
+						"expression": "({ val: 42 }).val"
+					}
+				}]
+			}
+		}]
+	}`
+
+	for _, apiVersion := range []string{"v1", "v2"} {
+		t.Run(fmt.Sprintf("api_%s", apiVersion), func(t *testing.T) {
+			// 1. Default (omitted) -> succeeds
+			w1 := performPostRequest(router,
+				fmt.Sprintf("/api/%s/generate_metrics_config?ignore_validation=true&no_inference=true", apiVersion),
+				"application/json", "application/x-protobuf", []byte(payloadWithMessageBuilderNode))
+			if want, got := http.StatusOK, w1.Result().StatusCode; want != got {
+				t.Errorf("Default POST returned status %d, want %d. Body: %s", got, want, w1.Body.String())
+			}
+
+			// 2. Explicitly true -> succeeds
+			w2 := performPostRequest(router,
+				fmt.Sprintf("/api/%s/generate_metrics_config?message_builder_node_supported=true&ignore_validation=true&no_inference=true", apiVersion),
+				"application/json", "application/x-protobuf", []byte(payloadWithMessageBuilderNode))
+			if want, got := http.StatusOK, w2.Result().StatusCode; want != got {
+				t.Errorf("POST with message_builder_node_supported=true returned status %d, want %d. Body: %s", got, want, w2.Body.String())
+			}
+
+			// 3. Explicitly false with MessageBuilderNode in expressions -> fails with 400 Bad Request
+			w3 := performPostRequest(router,
+				fmt.Sprintf("/api/%s/generate_metrics_config?message_builder_node_supported=false&ignore_validation=true&no_inference=true", apiVersion),
+				"application/json", "application/x-protobuf", []byte(payloadWithMessageBuilderNode))
+			if want, got := http.StatusBadRequest, w3.Result().StatusCode; want != got {
+				t.Errorf("POST with message_builder_node_supported=false and MessageBuilderNode returned status %d, want %d. Body: %s", got, want, w3.Body.String())
+			}
+			if got := w3.Body.String(); !strings.Contains(got, "message_builder_node is not supported when message_builder_node_supported is false") {
+				t.Errorf("response body = %s, want substring %q", got, "message_builder_node is not supported when message_builder_node_supported is false")
+			}
+
+			// 4. Explicitly false without MessageBuilderNode in expressions -> succeeds
+			w4 := performPostRequest(router,
+				fmt.Sprintf("/api/%s/generate_metrics_config?message_builder_node_supported=false&ignore_validation=true&no_inference=true", apiVersion),
+				"application/json", "application/x-protobuf", []byte(payloadWithoutMessageBuilderNode))
+			if want, got := http.StatusOK, w4.Result().StatusCode; want != got {
+				t.Errorf("POST with message_builder_node_supported=false without MessageBuilderNode returned status %d, want %d. Body: %s", got, want, w4.Body.String())
+			}
+
+			// 5. Invalid boolean parameter -> fails 400
+			w5 := performPostRequest(router,
+				fmt.Sprintf("/api/%s/generate_metrics_config?message_builder_node_supported=not_a_bool&ignore_validation=true&no_inference=true", apiVersion),
+				"application/json", "application/x-protobuf", []byte(payloadWithoutMessageBuilderNode))
+			if want, got := http.StatusBadRequest, w5.Result().StatusCode; want != got {
+				t.Errorf("POST with invalid message_builder_node_supported returned status %d, want %d. Body: %s", got, want, w5.Body.String())
+			}
+			if got := w5.Body.String(); !strings.Contains(got, "Failed to parse boolean value from message_builder_node_supported=not_a_bool") {
+				t.Errorf("response body = %s, want substring %q", got, "Failed to parse boolean value from message_builder_node_supported=not_a_bool")
+			}
+		})
+	}
+}
+
+func TestMessageBuilderNodeSupported_ValidateAPI(t *testing.T) {
+	ctx := context.Background()
+	router, _ := setupServer(ctx, t, false)
+
+	mcSingle := pb.MetricsConfig_builder{
+		Uuid:    "11111111-1111-1111-1111-111111111111",
+		Version: 3758096386,
+		ExpressionNodes: []*pb.Node{
+			pb.Node_builder{
+				MessageBuilderNode: pb.MessageBuilderNode_builder{
+					FieldAssignments: []*pb.MessageBuilderNode_FieldAssignment{
+						pb.MessageBuilderNode_FieldAssignment_builder{
+							FieldName:           proto.String("val"),
+							ExpressionNodeIndex: proto.Uint32(1),
+						}.Build(),
+					},
+				}.Build(),
+			}.Build(),
+			pb.Node_builder{
+				ConstantLeafNode: pb.ConstantLeafNode_builder{
+					Int32Value: proto.Int32(10),
+				}.Build(),
+			}.Build(),
+		},
+	}.Build()
+
+	mcMultiple := pb.MetricsConfig_builder{
+		Uuid:    "11111111-1111-1111-1111-111111111111",
+		Version: 3758096386,
+		ExpressionNodes: []*pb.Node{
+			pb.Node_builder{
+				MessageBuilderNode: pb.MessageBuilderNode_builder{
+					FieldAssignments: []*pb.MessageBuilderNode_FieldAssignment{
+						pb.MessageBuilderNode_FieldAssignment_builder{
+							FieldName:           proto.String("first"),
+							ExpressionNodeIndex: proto.Uint32(2),
+						}.Build(),
+					},
+				}.Build(),
+			}.Build(),
+			pb.Node_builder{
+				MessageBuilderNode: pb.MessageBuilderNode_builder{
+					FieldAssignments: []*pb.MessageBuilderNode_FieldAssignment{
+						pb.MessageBuilderNode_FieldAssignment_builder{
+							FieldName:           proto.String("second"),
+							ExpressionNodeIndex: proto.Uint32(2),
+						}.Build(),
+					},
+				}.Build(),
+			}.Build(),
+			pb.Node_builder{
+				ConstantLeafNode: pb.ConstantLeafNode_builder{
+					Int32Value: proto.Int32(20),
+				}.Build(),
+			}.Build(),
+		},
+	}.Build()
+
+	singleBytes, err := prototext.Marshal(mcSingle)
+	if err != nil {
+		t.Fatalf("prototext.Marshal failed: %v", err)
+	}
+
+	multipleBytes, err := prototext.Marshal(mcMultiple)
+	if err != nil {
+		t.Fatalf("prototext.Marshal failed: %v", err)
+	}
+
+	// 1. Default (omitted) -> passes
+	w1 := performPostRequest(router,
+		fmt.Sprintf("/api/%s/validate_metrics_config", constants.CurrentAPIVersion),
+		mcg.CONTENT_TYPE_TEXT_X_PROTOBUF, "", singleBytes)
+	if want, got := http.StatusOK, w1.Result().StatusCode; want != got {
+		t.Errorf("Validate with default message_builder_node_supported returned status %d, want %d. Body: %s", got, want, w1.Body.String())
+	}
+
+	// 2. Explicitly true -> passes
+	w2 := performPostRequest(router,
+		fmt.Sprintf("/api/%s/validate_metrics_config?message_builder_node_supported=true", constants.CurrentAPIVersion),
+		mcg.CONTENT_TYPE_TEXT_X_PROTOBUF, "", singleBytes)
+	if want, got := http.StatusOK, w2.Result().StatusCode; want != got {
+		t.Errorf("Validate with message_builder_node_supported=true returned status %d, want %d. Body: %s", got, want, w2.Body.String())
+	}
+
+	// 3. Explicitly false -> fails with 400 Bad Request
+	w3 := performPostRequest(router,
+		fmt.Sprintf("/api/%s/validate_metrics_config?message_builder_node_supported=false", constants.CurrentAPIVersion),
+		mcg.CONTENT_TYPE_TEXT_X_PROTOBUF, "", singleBytes)
+	if want, got := http.StatusBadRequest, w3.Result().StatusCode; want != got {
+		t.Errorf("Validate with message_builder_node_supported=false returned status %d, want %d. Body: %s", got, want, w3.Body.String())
+	}
+	if got := w3.Body.String(); !strings.Contains(got, "expression_nodes[0]: message_builder_node is not supported when message_builder_node_supported is false") {
+		t.Errorf("response body = %s, want substring %q", got, "expression_nodes[0]: message_builder_node is not supported when message_builder_node_supported is false")
+	}
+
+	// 4. Explicitly false with multiple MessageBuilderNodes -> reports ALL violations without truncating
+	w4 := performPostRequest(router,
+		fmt.Sprintf("/api/%s/validate_metrics_config?message_builder_node_supported=false", constants.CurrentAPIVersion),
+		mcg.CONTENT_TYPE_TEXT_X_PROTOBUF, "", multipleBytes)
+	if want, got := http.StatusBadRequest, w4.Result().StatusCode; want != got {
+		t.Errorf("Validate with multiple nodes returned status %d, want %d. Body: %s", got, want, w4.Body.String())
+	}
+	body4 := w4.Body.String()
+	if !strings.Contains(body4, "expression_nodes[0]") || !strings.Contains(body4, "expression_nodes[1]") {
+		t.Errorf("response body = %s, want substrings %q and %q", body4, "expression_nodes[0]", "expression_nodes[1]")
+	}
+
+	// 5. Invalid query parameter -> fails with 400
+	w5 := performPostRequest(router,
+		fmt.Sprintf("/api/%s/validate_metrics_config?message_builder_node_supported=invalidBool", constants.CurrentAPIVersion),
+		mcg.CONTENT_TYPE_TEXT_X_PROTOBUF, "", singleBytes)
+	if want, got := http.StatusBadRequest, w5.Result().StatusCode; want != got {
+		t.Errorf("Validate with invalid query param returned status %d, want %d. Body: %s", got, want, w5.Body.String())
+	}
+	if got := w5.Body.String(); !strings.Contains(got, "Failed to parse boolean value from message_builder_node_supported=invalidBool") {
+		t.Errorf("response body = %s, want substring %q", got, "Failed to parse boolean value from message_builder_node_supported=invalidBool")
+	}
+}
+
+func TestValidateMessageBuilderNodesSupported(t *testing.T) {
+	nodes := []*pb.Node{
+		pb.Node_builder{
+			ConstantLeafNode: pb.ConstantLeafNode_builder{Int32Value: proto.Int32(1)}.Build(),
+		}.Build(),
+		pb.Node_builder{
+			MessageBuilderNode: pb.MessageBuilderNode_builder{}.Build(),
+		}.Build(),
+		pb.Node_builder{
+			MessageBuilderNode: pb.MessageBuilderNode_builder{}.Build(),
+		}.Build(),
+	}
+
+	errs := mcg.ValidateMessageBuilderNodesSupported(nodes)
+	if got, want := len(errs), 2; got != want {
+		t.Fatalf("ValidateMessageBuilderNodesSupported() error count = %d, want %d", got, want)
+	}
+	if !strings.Contains(errs[0].Status.Message, "expression_nodes[1]") {
+		t.Errorf("errs[0].Status.Message = %q, want substring %q", errs[0].Status.Message, "expression_nodes[1]")
+	}
+	if !strings.Contains(errs[1].Status.Message, "expression_nodes[2]") {
+		t.Errorf("errs[1].Status.Message = %q, want substring %q", errs[1].Status.Message, "expression_nodes[2]")
 	}
 }
