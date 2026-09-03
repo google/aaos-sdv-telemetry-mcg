@@ -39,6 +39,30 @@ paths:
         explode: true
         schema:
           type: boolean
+      - name: no_inference
+        in: query
+        description: Disable automatic message type and field descriptor inference
+        required: false
+        style: form
+        explode: true
+        schema:
+          type: boolean
+      - name: disallow_comparison_operator_chaining
+        in: query
+        description: Disallow unparenthesized comparison operator chaining (e.g. `a < b < c`)
+        required: false
+        style: form
+        explode: true
+        schema:
+          type: boolean
+      - name: enable_right_associative_exponentiation
+        in: query
+        description: Make the exponentiation operator (`**`) right-associative instead of left-associative
+        required: false
+        style: form
+        explode: true
+        schema:
+          type: boolean
       requestBody:
         description: Metrics config request
         content:
@@ -256,6 +280,30 @@ paths:
       - name: ignore_validation
         in: query
         description: Ignore any validation errors and return the metrics config anyways
+        required: false
+        style: form
+        explode: true
+        schema:
+          type: boolean
+      - name: no_inference
+        in: query
+        description: Disable automatic message type and field descriptor inference
+        required: false
+        style: form
+        explode: true
+        schema:
+          type: boolean
+      - name: disallow_comparison_operator_chaining
+        in: query
+        description: Disallow unparenthesized comparison operator chaining (e.g. `a < b < c`)
+        required: false
+        style: form
+        explode: true
+        schema:
+          type: boolean
+      - name: enable_right_associative_exponentiation
+        in: query
+        description: Make the exponentiation operator (`**`) right-associative instead of left-associative
         required: false
         style: form
         explode: true
@@ -516,13 +564,33 @@ components:
         The expression to evaluate. Expressions can express arithmetic calculations, logical conditions, and data comparisons. Parentheses `()` can be used to force a specific order of operations.
 
         **Syntax examples:**
-        - **Data access:** `source_name`, `source_name.field`, `source_name.field.subfield`
-        - **Arithmetic:** `+`, `-`, `*`, `/`, `%`, `**`
-        - **Special floating-point values:** `Infinity`, `NaN`
+        - **Data access & subscripting:** `source_name`, `source_name.field`, `source_name.field.subfield`, `source[0]`, `source[0].field`
+        - **Arithmetic:** `+`, `-` (binary and unary), `*`, `/`, `%`, `**`
+        - **Special floating-point values:** `Infinity`, `inf`, `-Infinity`, `-inf`, `NaN`, `nan`
         - **Logical:** `&&`, `||`, `!`, `^`
         - **Relational:** `==`, `!=`, `<`, `<=`, `>`, `>=`
-        - **List:** `contains(list, item)`, `doesnotcontain(list, item)`, `alleq(list, value)`
+        - **List operations:** `length(list)`, `contains(list, item)`, `doesnotcontain(list, item)`, `alleq(list, value)`, `source[index]`
         - **Functions:** `timestamp(clock_type)`, `abs(n)`, `floor(n)`, `round(n)`, `ceil(n)`
+          - Supported `clock_type` values: `REALTIME_CLOCK`, `MONOTONIC_TIME_SINCE_BOOT`, `MONOTONIC_TIME_SINCE_BOOT_OR_RESUME`
+
+        **Operator Precedence (Highest to Lowest):**
+        1. `source[index]`, `.field`, built-in functions (`abs`, `floor`, `round`, `ceil`, `length`, `contains`, `doesnotcontain`, `alleq`, `timestamp`), and exponentiation `**` (left-associative by default, right-associative when `enable_right_associative_exponentiation=true`)
+        2. Logical NOT `!` (unary prefix)
+        3. Multiplication `*`, Division `/`, Modulo `%`
+        4. Addition `+`, Subtraction `-`, Unary minus `-`
+        5. Relational comparisons `<`, `<=`, `>`, `>=`
+        6. Equality comparisons `==`, `!=`
+        7. Logical XOR `^`
+        8. Logical AND `&&`
+        9. Logical OR `||`
+
+        **Parentheses `()` and Square Brackets `[]` Rules:**
+        - **Parentheses `()`**:
+          - Used to override operator precedence: e.g. `(a + b) * c`.
+          - Required for all function calls: `floor(source.x)`, `contains(source.list, 1)`. Multi-argument functions separate arguments with commas `,`.
+          - Bare redundant double parentheses like `((x))` or `((a + b))` are disallowed. Single-parenthesized unary operands (e.g. `-(x)` or `!(x)`) are allowed.
+        - **Square Brackets `[]`**:
+          - Used exclusively for list subscripting / index access: `source[index]`. Commas inside square brackets are disallowed.
     requests.FireInitial:
       type: boolean
       description: |-
