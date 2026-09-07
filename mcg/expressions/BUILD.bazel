@@ -18,7 +18,10 @@ go_library(
     name = "expressions",
     srcs = [
         "helpers.go",
+        "lexer.go",
         "parse.go",
+        "token_stream.go",
+        "tokens.go",
     ],
     importpath = "sdv.googlesource.com/mcg/mcg/expressions",
     visibility = ["//visibility:public"],
@@ -33,13 +36,17 @@ go_test(
     name = "expressions_test",
     size = "small",
     srcs = [
+        "lexer_test.go",
         "parse_test.go",
         "stack_test.go",
+        "token_stream_test.go",
+        "tokens_test.go",
     ],
     embed = [":expressions"],
     deps = [
         "//third_party/aosp/sdv/telemetry/metrics_configuration:telemetry_go_proto",
         "@com_github_google_go_cmp//cmp",
+        "@com_github_google_go_cmp//cmp/cmpopts",
         "@org_golang_google_protobuf//proto",
         "@org_golang_google_protobuf//testing/protocmp",
     ],

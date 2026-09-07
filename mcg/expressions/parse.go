@@ -22,13 +22,10 @@ import (
 	"fmt"
 	"log"
 	"math"
-	"regexp"
+	"math/big"
 	"slices"
 	"sort"
-	"strconv"
 	"strings"
-	"unicode"
-	"unicode/utf8"
 
 	"google.golang.org/protobuf/proto"
 
@@ -165,22 +162,20 @@ func (p *ParserShunt) compileOne(source string) (uint32, error) {
 				FieldNames: fields,
 			}
 			if pub == "" {
-				if i == 0 {
+				if i == 0 || !isOperand(tokens[i-1]) {
 					return 0, mcgerrors.InvalidExpressionError(source, fmt.Errorf("postfix field access must follow an expression"))
 				}
-				if isOperand(tokens[i-1]) {
-					// Postfix field access acts as an operator with the same precedence as Subscript.
-					// We must collapse the operator stack for any operators with higher or equal precedence.
-					if err := p.collapseOperators(precedence[OperatorSubscript], &operandStack, &operatorStack); err != nil {
-						return 0, mcgerrors.InvalidExpressionError(source, err)
-					}
-
-					if operandStack.isEmpty() {
-						return 0, mcgerrors.InvalidExpressionError(source, fmt.Errorf("empty operand stack for postfix field access"))
-					}
-					lhs := operandStack.pop()
-					fieldLeafNodeBuilder.ExpressionNodeIndex = proto.Uint32(lhs.index)
+				// Postfix field access acts as an operator with the same precedence as Subscript.
+				// We must collapse the operator stack for any operators with higher or equal precedence.
+				if err := p.collapseOperators(precedence[OperatorSubscript], &operandStack, &operatorStack); err != nil {
+					return 0, mcgerrors.InvalidExpressionError(source, err)
 				}
+
+				if operandStack.isEmpty() {
+					return 0, mcgerrors.InvalidExpressionError(source, fmt.Errorf("empty operand stack for postfix field access"))
+				}
+				lhs := operandStack.pop()
+				fieldLeafNodeBuilder.ExpressionNodeIndex = proto.Uint32(lhs.index)
 			}
 			p.pushNodeToOperandStack(pb.Node_builder{FieldLeafNode: fieldLeafNodeBuilder.Build()}.Build(), &operandStack, false)
 		case bool:
@@ -497,93 +492,67 @@ func (p *ParserShunt) pushNodeToOperandStack(nod *pb.Node, operandStack *stack[o
 }
 
 func (p *ParserShunt) tokenize(source string) ([]token, error) {
-	var tokens []token
-	i := 0
+	stream, err := Lex(strings.NewReader(source))
+	if err != nil {
+		return nil, err
+	}
 
-	for {
-		if i >= len(source) {
-			return tokens, nil
-		}
-		c, adv := utf8.DecodeRuneInString(source[i:])
-		if ('0' <= c && c <= '9') || c == '.' || c == '_' || ('a' <= c && c <= 'z') || ('A' <= c && c <= 'Z') {
-			l := peekFunctionLen(source[i:])
-			if l > 0 {
-				fun, err := parseFunction(source[i : i+l])
+	var tokens []token
+	for !stream.IsEOF() {
+		tok := stream.Next()
+		switch tok.Kind {
+		case TokenBool:
+			tokens = append(tokens, tok.Value.(bool))
+		case TokenNumber:
+			if bi, ok := tok.Value.(*big.Int); ok {
+				value, err := resolveBigInt(bi)
 				if err != nil {
-					return nil, err
+					return []token{}, err
 				}
-				tokens = append(tokens, fun)
+				tokens = append(tokens, value)
 			} else {
-				l = peekValueLen(source[i:], adv)
-				if l == 0 {
-					panic("peekValueLen disagrees with character matching")
-				}
-				val, err := parseValue(source[i : i+l])
+				tokens = append(tokens, tok.Value)
+			}
+		case TokenIdentifier:
+			ident := tok.Value.(string)
+			if ident == "timestamp" && stream.Peek().Kind == TokenLeftParen {
+				node, err := parseTimestampFunction(stream)
 				if err != nil {
 					return nil, err
 				}
-				tokens = append(tokens, val)
+				tokens = append(tokens, node)
+				break
 			}
-			adv = l
-		} else if c == '-' {
-			lenNumber := peekNumberLen(source[i+1:])
+			val, err := parseValue(ident)
+			if err != nil {
+				return nil, err
+			}
+			tokens = append(tokens, val)
+		case TokenMinus:
 			if isLastTokenOperator(tokens) {
-				if lenNumber > 0 {
-					val, err := parseValue(source[i : i+1+lenNumber])
+				if stream.Peek().Kind == TokenNumber {
+					negated, err := negateNumber(stream.Next().Value)
 					if err != nil {
 						return nil, err
 					}
-					tokens = append(tokens, val)
-					adv = 1 + lenNumber
-				} else if lenInf := peekInfLen(source[i+1:]); lenInf > 0 {
-					val, err := parseValue(source[i : i+1+lenInf])
-					if err != nil {
-						return nil, err
-					}
-					tokens = append(tokens, val)
-					adv = 1 + lenInf
+					tokens = append(tokens, negated)
 				} else {
 					tokens = append(tokens, OperatorUnaryMinus)
 				}
 			} else {
 				tokens = append(tokens, OperatorSubtract)
 			}
-		} else if c == '!' {
-			if strings.HasPrefix(source[i:], "!=") {
-				tokens = append(tokens, OperatorNotEq)
-				adv = 2
-			} else {
-				tokens = append(tokens, OperatorNot)
-				adv = 1
-			}
-		} else if c == '(' {
-			tokens = append(tokens, OperatorLeftParen)
-		} else if c == ')' {
-			tokens = append(tokens, OperatorRightParen)
-		} else if c == '[' {
-			tokens = append(tokens, OperatorLeftSquareBracket)
-		} else if c == ']' {
-			tokens = append(tokens, OperatorRightSquareBracket)
-		} else if c == ',' {
-			tokens = append(tokens, OperatorComma)
-		} else if unicode.IsSpace(c) {
-			// skip whitespace
-		} else {
-			l := peekOperator(source[i:])
-			val, err := parseOperator(source[i : i+l])
+		default:
+			op, err := parseOperator(tok.Kind)
 			if err != nil {
 				return nil, err
 			}
-			tokens = append(tokens, val)
-			adv = l
+			tokens = append(tokens, op)
 		}
-		i += adv
 	}
+	return tokens, nil
 }
 
-// Returns whether the last token represents an operator. Assumes that left
-// parentheses follow operators and right parentheses follow expressions that
-// evaluate to operands.
 func isLastTokenOperator(tok []token) bool {
 	if len(tok) == 0 {
 		return true
@@ -595,61 +564,31 @@ func isLastTokenOperator(tok []token) bool {
 	return ok
 }
 
-var (
-	rgxInf                = regexp.MustCompile(`^(?i:infinity|inf)(?:[^0-9a-zA-Z_]|$)`)
-	rgxNumber             = regexp.MustCompile("^[0-9.]+")
-	rgxNumberOrIdentifier = regexp.MustCompile("^[0-9a-zA-Z._]+")
-	rgxEndOperator        = regexp.MustCompile("[0-9a-zA-Z._)(" + rgxFragSpaces + rgxUnaryMinus + "\\[\\]]")
-	// All space characters in Latin-1 plus the Z character class
-	rgxFragSpaces = ` \t\n\v\f\r\x85\xa0\pZ`
-	// A unary minus can directly follow another operator and as such needs to
-	// be included in the list of characters that can signal the end of a single
-	// operator.
-	rgxUnaryMinus = "\\-"
-	rgxFunction   = regexp.MustCompile(`^timestamp\(.*?\)`)
-)
+func parseTimestampFunction(stream *TokenStream) (*pb.Node, error) {
+	if stream.Peek().Kind != TokenLeftParen {
+		return nil, fmt.Errorf("timestamp requires parentheses")
+	}
+	stream.Next() // consume TokenLeftParen
 
-// Returns the number of contiguous bytes representing "inf" or "infinity" (case-insensitive)
-func peekInfLen(s string) int {
-	loc := rgxInf.FindStringIndex(s)
-	if loc == nil {
-		return 0
+	nextTok := stream.Next()
+	if nextTok.Kind == TokenRightParen {
+		return nil, fmt.Errorf("timestamp function requires a parameter")
 	}
-	match := s[:loc[1]]
-	if len(match) >= 8 && strings.EqualFold(match[:8], "infinity") {
-		return 8
+	if nextTok.Kind != TokenIdentifier {
+		return nil, fmt.Errorf("%v is not a valid timestamp parameter", nextTok)
 	}
-	if len(match) >= 3 && strings.EqualFold(match[:3], "inf") {
-		return 3
-	}
-	return 0
-}
 
-// Returns the number of contiguous bytes that might comprise a number
-func peekNumberLen(s string) int {
-	loc := rgxNumber.FindStringIndex(s)
-	if loc == nil {
-		return 0
+	param := nextTok.Value.(string)
+	afterParam := stream.Next()
+	if afterParam.Kind == TokenComma {
+		return nil, fmt.Errorf("timestamp function expects exactly one parameter")
 	}
-	return loc[1]
-}
-
-// Returns the number of contiguous bytes that represent a function expression
-// (from the first letter of the function name to its closing bracket) or 0 if
-// no function was found
-func peekFunctionLen(s string) int {
-	loc := rgxFunction.FindStringIndex(s)
-	if loc == nil {
-		return 0
+	if afterParam.Kind != TokenRightParen {
+		return nil, fmt.Errorf("expected closing parenthesis after timestamp parameter, got %v", afterParam)
 	}
-	return loc[1]
-}
 
-// Parses a string into a FunctionLeafNode or returns an error if the parameters
-// to the function are invalid
-func parseFunction(s string) (*pb.Node, error) {
-	switch s {
-	case "timestamp(REALTIME_CLOCK)":
+	switch param {
+	case "REALTIME_CLOCK":
 		return pb.Node_builder{
 			FunctionLeafNode: pb.FunctionLeafNode_builder{
 				GetCurrentTimestamp: pb.GetCurrentTimestampFunction_builder{
@@ -657,7 +596,7 @@ func parseFunction(s string) (*pb.Node, error) {
 				}.Build(),
 			}.Build(),
 		}.Build(), nil
-	case "timestamp(MONOTONIC_TIME_SINCE_BOOT)":
+	case "MONOTONIC_TIME_SINCE_BOOT":
 		return pb.Node_builder{
 			FunctionLeafNode: pb.FunctionLeafNode_builder{
 				GetCurrentTimestamp: pb.GetCurrentTimestampFunction_builder{
@@ -665,7 +604,7 @@ func parseFunction(s string) (*pb.Node, error) {
 				}.Build(),
 			}.Build(),
 		}.Build(), nil
-	case "timestamp(MONOTONIC_TIME_SINCE_BOOT_OR_RESUME)":
+	case "MONOTONIC_TIME_SINCE_BOOT_OR_RESUME":
 		return pb.Node_builder{
 			FunctionLeafNode: pb.FunctionLeafNode_builder{
 				GetCurrentTimestamp: pb.GetCurrentTimestampFunction_builder{
@@ -674,53 +613,47 @@ func parseFunction(s string) (*pb.Node, error) {
 			}.Build(),
 		}.Build(), nil
 	default:
-		param := regexp.MustCompile(`^timestamp\((.*)\)`).FindStringSubmatch(s)
-		if strings.TrimSpace(param[1]) == "" {
-			return nil, fmt.Errorf("timestamp function requires a parameter")
-		}
-		if strings.Contains(param[1], ",") {
-			return nil, fmt.Errorf("timestamp function expects exactly one parameter")
-		}
-		return nil, fmt.Errorf("%q is not a valid timestamp parameter", param[1])
+		return nil, fmt.Errorf("%q is not a valid timestamp parameter", param)
 	}
 }
 
-// Returns the number of contiguous bytes that satisfy the number-or-identifier check.
-func peekValueLen(s string, startAt int) int {
-	loc := rgxNumberOrIdentifier.FindStringIndex(s)
-	if loc == nil {
-		return 0
+// resolveBigInt converts the provided `*big.Int` to either int64, int32, or
+// float64, which makes it compatible with the types the Telemetry Service
+// supports. Returns an error iff the resulting integer is too big even for a
+// float64.
+func resolveBigInt(bi *big.Int) (any, error) {
+	if bi.IsInt64() {
+		v := bi.Int64()
+		if v >= math.MinInt32 && v <= math.MaxInt32 {
+			return int32(v), nil
+		}
+		return v, nil
 	}
-	if loc[0] != 0 {
-		panic("peekValueLen regex not anchored")
+	// Fall back to float64 if it doesn't fit into int64.
+	f64, _ := new(big.Float).SetInt(bi).Float64()
+	if math.IsInf(f64, 0) {
+		return nil, fmt.Errorf("integer %v is too large to fit into any numeric type", bi)
 	}
-	if loc[1] < startAt {
-		panic("peekValueLen found less than 1 character")
-	}
-	return loc[1]
+	return f64, nil
 }
 
-// Returns the number of contiguous bytes that might comprise an operator.
-//
-// Uses a regex search for the first thing that parses as anything other than an operator.
-func peekOperator(s string) int {
-	loc := rgxEndOperator.FindStringIndex(s)
-	if loc == nil {
-		return len(s)
+func negateNumber(val any) (any, error) {
+	switch v := val.(type) {
+	case *big.Int:
+		// Negate with arbitrary precision first, and only then resolve the
+		// result to a primitive type.
+		return resolveBigInt(new(big.Int).Neg(v))
+	case float32:
+		return -v, nil
+	case float64:
+		return -v, nil
+	default:
+		return nil, fmt.Errorf("unexpected number type %T: %v", val, val)
 	}
-	return loc[0]
 }
 
 func parseValue(s string) (token, error) {
 	switch s {
-	case "":
-		return nil, fmt.Errorf("internal parsing error: empty string")
-
-	case "true":
-		return bool(true), nil
-	case "false":
-		return bool(false), nil
-
 	case "alleq":
 		return OperatorAllEq, nil
 	case "contains":
@@ -739,24 +672,6 @@ func parseValue(s string) (token, error) {
 		return OperatorLength, nil
 	}
 
-	i32, err := strconv.ParseInt(s, 10, 32)
-	if err == nil {
-		return int32(i32), nil
-	}
-	i64, err := strconv.ParseInt(s, 10, 64)
-	if err == nil {
-		return int64(i64), nil
-	}
-
-	if !strings.ContainsAny(s, "eEpP") {
-		f64, err := strconv.ParseFloat(s, 64)
-		if err == nil {
-			if f32 := float32(f64); float64(f32) == f64 || (math.IsNaN(float64(f32)) && math.IsNaN(f64)) {
-				return f32, nil
-			}
-			return float64(f64), nil
-		}
-	}
 	split := strings.Split(s, ".")
 	if strings.HasPrefix(s, ".") {
 		if len(split) <= 1 {
@@ -865,60 +780,58 @@ var operatorToProto []*pb.CombinationNode = []*pb.CombinationNode{
 	// go/keep-sorted end
 }
 
-func parseOperator(s string) (token, error) {
-	switch s {
-	case "+":
+func parseOperator(k TokenKind) (Operator, error) {
+	switch k {
+	case TokenPlus:
 		return OperatorAdd, nil
-	case "-":
-		return OperatorSubtract, nil
-	case "*":
+	case TokenStar:
 		return OperatorMultiply, nil
-	case "/":
+	case TokenSlash:
 		return OperatorDivide, nil
-	case "**":
+	case TokenStarStar:
 		return OperatorPower, nil
-	case "%":
+	case TokenPercent:
 		return OperatorModulo, nil
-	case "&&":
+	case TokenAmpAmp:
 		return OperatorAnd, nil
-	case "||":
+	case TokenBarBar:
 		return OperatorOr, nil
-	case "^":
+	case TokenCaret:
 		return OperatorXor, nil
-	case "==":
+	case TokenEqualEqual:
 		return OperatorEq, nil
-	case ">=":
+	case TokenNotEqual:
+		return OperatorNotEq, nil
+	case TokenGreaterThanOrEqual:
 		return OperatorGtEq, nil
-	case ">":
+	case TokenGreaterThan:
 		return OperatorGt, nil
-	case "<=":
+	case TokenLessThanOrEqual:
 		return OperatorLtEq, nil
-	case "<":
+	case TokenLessThan:
 		return OperatorLt, nil
-	case "alleq":
-		return OperatorAllEq, nil
-	case "contains":
-		return OperatorContains, nil
-	case "doesnotcontain":
-		return OperatorDoesNotContain, nil
-	case "ceil":
-		return OperatorCeil, nil
-	case "floor":
-		return OperatorFloor, nil
-	case "round":
-		return OperatorRound, nil
-	case "abs":
-		return OperatorAbsolute, nil
-	case "length":
-		return OperatorLength, nil
+	case TokenExclamation:
+		return OperatorNot, nil
+	case TokenLeftParen:
+		return OperatorLeftParen, nil
+	case TokenRightParen:
+		return OperatorRightParen, nil
+	case TokenLeftBracket:
+		return OperatorLeftSquareBracket, nil
+	case TokenRightBracket:
+		return OperatorRightSquareBracket, nil
+	case TokenComma:
+		return OperatorComma, nil
 	}
-	return nil, fmt.Errorf("Unknown operator %q", s)
+	return OperatorInvalid, fmt.Errorf("unknown operator %v", k)
 }
 
 // String implements fmt.Stringer.
 func (op Operator) String() string {
 	return operatorToString[op]
 }
+
+var _ fmt.Stringer = (*Operator)(nil)
 
 var operatorToString []string = []string{
 	// go/keep-sorted start
