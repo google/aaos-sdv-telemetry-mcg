@@ -476,12 +476,12 @@ func parseMetricsConfig(bytes []byte, contentType string, apiVersion constants.A
 	switch contentType {
 	case CONTENT_TYPE_APP_X_PROTOBUF:
 		if err := proto.Unmarshal(bytes, mc); err != nil {
-			return nil, err
+			return nil, mcgerrors.InvalidArgumentFromError(err)
 		}
 	case CONTENT_TYPE_TEXT_X_PROTOBUF:
 		nodes, err := txtpbfmt.Parse(bytes)
 		if err != nil {
-			return nil, fmt.Errorf("failed to parse textproto: %w", err)
+			return nil, mcgerrors.InvalidArgument(fmt.Sprintf("failed to parse textproto: %v", err))
 		}
 
 		if err := validateFormat(nodes, apiVersion); err != nil {
@@ -494,7 +494,7 @@ func parseMetricsConfig(bytes []byte, contentType string, apiVersion constants.A
 		}
 
 		if err := prototext.Unmarshal(bytes, mc); err != nil {
-			return nil, err
+			return nil, mcgerrors.InvalidArgumentFromError(err)
 		}
 	default:
 		return nil, mcgerrors.InvalidArgument(fmt.Sprintf("Unsupported content type: %s", contentType))

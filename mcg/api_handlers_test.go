@@ -1436,3 +1436,45 @@ func TestRightAssociativeExponentiationAPI(t *testing.T) {
 		})
 	}
 }
+
+func TestGetFileDescriptorInvalidPayload(t *testing.T) {
+	ctx := context.Background()
+	router, _ := setupServer(ctx, t, false)
+
+	testCases := []struct {
+		name        string
+		contentType string
+		payload     []byte
+	}{
+		{
+			name:        "unknown_field_textproto",
+			contentType: mcg.CONTENT_TYPE_TEXT_X_PROTOBUF,
+			payload:     []byte("not_a_metrics_config_field: 123"),
+		},
+		{
+			name:        "malformed_syntax_textproto",
+			contentType: mcg.CONTENT_TYPE_TEXT_X_PROTOBUF,
+			payload:     []byte("::: invalid textproto syntax {"),
+		},
+		{
+			name:        "malformed_binary_proto",
+			contentType: mcg.CONTENT_TYPE_APP_X_PROTOBUF,
+			payload:     []byte("invalid-binary-proto-bytes"),
+		},
+	}
+
+	for _, apiVersion := range []string{"v1", "v2"} {
+		for _, tc := range testCases {
+			t.Run(fmt.Sprintf("%s_%s", apiVersion, tc.name), func(t *testing.T) {
+				w := performPostRequest(router,
+					fmt.Sprintf("/api/%s/get_file_descriptor_set", apiVersion),
+					tc.contentType, "text/x-protobuf", tc.payload)
+
+				if want, got := http.StatusBadRequest, w.Result().StatusCode; want != got {
+					t.Errorf("POST /api/%s/get_file_descriptor_set returned status %d, want %d. Body: %s",
+						apiVersion, got, want, w.Body.String())
+				}
+			})
+		}
+	}
+}
