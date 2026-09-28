@@ -1567,27 +1567,27 @@ func TestShuntParseEdgeCases(t *testing.T) {
 		{
 			name:        "missing_closing_paren",
 			expression:  "(1 + 2",
-			expectError: "FAILED_PRECONDITION: Failed to parse expression \"(1 + 2\": Found opening parenthesis without matching closing parenthesis",
+			expectError: "FAILED_PRECONDITION: Failed to parse expression \"(1 + 2\": Found \"(\" without matching \")\"",
 		},
 		{
 			name:        "missing_opening_paren",
 			expression:  "1 + 2)",
-			expectError: "FAILED_PRECONDITION: Failed to parse expression \"1 + 2)\": Found closing parenthesis without matching opening parenthesis",
+			expectError: "FAILED_PRECONDITION: Failed to parse expression \"1 + 2)\": Found \")\" without matching \"(\"",
 		},
 		{
 			name:        "leading_closing_paren",
 			expression:  ")1 + 2",
-			expectError: "FAILED_PRECONDITION: Failed to parse expression \")1 + 2\": Found closing parenthesis without matching opening parenthesis",
+			expectError: "FAILED_PRECONDITION: Failed to parse expression \")1 + 2\": Found \")\" without matching \"(\"",
 		},
 		{
 			name:        "empty_parentheses",
 			expression:  "()",
-			expectError: "FAILED_PRECONDITION: Failed to parse expression \"()\": Found redundant parenthesis",
+			expectError: "FAILED_PRECONDITION: Failed to parse expression \"()\": Found redundant parentheses",
 		},
 		{
 			name:        "redundant_parentheses",
 			expression:  "(10)",
-			expectError: "FAILED_PRECONDITION: Failed to parse expression \"(10)\": Found redundant parenthesis",
+			expectError: "FAILED_PRECONDITION: Failed to parse expression \"(10)\": Found redundant parentheses",
 		},
 		{
 			name:        "invalid_timestamp_source",
@@ -2787,8 +2787,8 @@ func TestShuntParse_RedundantParenthesesRejected(t *testing.T) {
 			if err == nil {
 				t.Fatalf("expected error for %q, got success", tc.expression)
 			}
-			if !strings.Contains(err.Error(), "Found redundant parenthesis") {
-				t.Errorf("expected error containing 'Found redundant parenthesis', got: %v", err)
+			if !strings.Contains(err.Error(), "Found redundant parentheses") {
+				t.Errorf("expected error containing 'Found redundant parentheses', got: %v", err)
 			}
 		})
 	}
@@ -2894,37 +2894,37 @@ func TestShuntParse_MismatchedDelimiters(t *testing.T) {
 		{
 			name:        "paren_closed_with_bracket",
 			expression:  "(1 + 2]",
-			expectError: "Found closing square bracket without matching opening square bracket",
+			expectError: "Found \"]\" without matching \"[\"",
 		},
 		{
 			name:        "bracket_closed_with_paren",
 			expression:  "source[0)",
-			expectError: "Found closing parenthesis without matching opening parenthesis",
+			expectError: "Found \")\" without matching \"(\"",
 		},
 		{
 			name:        "bracket_with_expression_closed_with_paren",
 			expression:  "source[1 + 2)",
-			expectError: "Found closing parenthesis without matching opening parenthesis",
+			expectError: "Found \")\" without matching \"(\"",
 		},
 		{
 			name:        "function_paren_closed_with_bracket",
 			expression:  "alleq(1, 2]",
-			expectError: "Found closing square bracket without matching opening square bracket",
+			expectError: "Found \"]\" without matching \"[\"",
 		},
 		{
 			name:        "function_subscript_closed_with_paren",
 			expression:  "abs(a[5)",
-			expectError: "Found closing parenthesis without matching opening parenthesis",
+			expectError: "Found \")\" without matching \"(\"",
 		},
 		{
 			name:        "function_paren_closed_with_bracket_no_subscript",
 			expression:  "abs(a5])",
-			expectError: "Found closing square bracket without matching opening square bracket",
+			expectError: "Found \"]\" without matching \"[\"",
 		},
 		{
 			name:        "function_paren_closed_with_bracket_followed_by_tokens",
 			expression:  "abs(1] bla)",
-			expectError: "Found closing square bracket without matching opening square bracket",
+			expectError: "Found \"]\" without matching \"[\"",
 		},
 	}
 
@@ -2977,12 +2977,12 @@ func TestShuntParse_TimestampFunctionErrors(t *testing.T) {
 		{
 			name:        "timestamp_operator_param",
 			expression:  "timestamp(+)",
-			expectError: "+ is not a valid timestamp parameter",
+			expectError: "\"+\" is not a valid timestamp parameter",
 		},
 		{
 			name:        "timestamp_missing_closing_paren",
 			expression:  "timestamp(REALTIME_CLOCK + 1)",
-			expectError: "expected closing parenthesis after timestamp parameter, got +",
+			expectError: "expected \")\" after timestamp parameter, got \"+\"",
 		},
 	}
 

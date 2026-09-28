@@ -282,10 +282,10 @@ func (p *ParserShunt) compileOne(source string) (uint32, error) {
 	}
 	for !operatorStack.isEmpty() {
 		if slices.Contains(operatorStack, OperatorLeftParen) {
-			return 0, mcgerrors.InvalidExpressionError(source, fmt.Errorf("Found opening parenthesis without matching closing parenthesis"))
+			return 0, mcgerrors.InvalidExpressionError(source, fmt.Errorf("Found \"(\" without matching \")\""))
 		}
 		if slices.Contains(operatorStack, OperatorLeftSquareBracket) {
-			return 0, mcgerrors.InvalidExpressionError(source, fmt.Errorf("Found opening square bracket without matching closing square bracket"))
+			return 0, mcgerrors.InvalidExpressionError(source, fmt.Errorf("Found \"[\" without matching \"]\""))
 		}
 
 		lastOp := operatorStack.pop()
@@ -370,7 +370,7 @@ func (p *ParserShunt) handleRightParen(operandStack *stack[operand], operatorSta
 		if op == OperatorLeftParen {
 			if !foundOperator {
 				if operatorStack.isEmpty() || (!isFunctionLike(operatorStack.peek()) && !isUnaryOperator(operatorStack.peek())) {
-					return fmt.Errorf("Found redundant parenthesis")
+					return fmt.Errorf("Found redundant parentheses")
 				}
 			}
 			if !operandStack.isEmpty() {
@@ -389,7 +389,7 @@ func (p *ParserShunt) handleRightParen(operandStack *stack[operand], operatorSta
 			return nil
 		}
 		if op == OperatorLeftSquareBracket {
-			return fmt.Errorf("Found closing parenthesis without matching opening parenthesis")
+			return fmt.Errorf("Found \")\" without matching \"(\"")
 		}
 
 		foundOperator = true
@@ -400,7 +400,7 @@ func (p *ParserShunt) handleRightParen(operandStack *stack[operand], operatorSta
 		p.pushNodeToOperandStack(n, operandStack, isComparisonOperator(op))
 	}
 
-	return fmt.Errorf("Found closing parenthesis without matching opening parenthesis")
+	return fmt.Errorf("Found \")\" without matching \"(\"")
 }
 
 func (p *ParserShunt) handleRightSquareBracket(operandStack *stack[operand], operatorStack *stack[Operator]) error {
@@ -409,12 +409,12 @@ func (p *ParserShunt) handleRightSquareBracket(operandStack *stack[operand], ope
 
 		if op == OperatorLeftSquareBracket {
 			if operatorStack.isEmpty() || operatorStack.peek() != OperatorSubscript {
-				return fmt.Errorf("Found square bracket without matching subscript operator")
+				return fmt.Errorf("Found \"[\" without matching subscript operator")
 			}
 			return nil
 		}
 		if op == OperatorLeftParen {
-			return fmt.Errorf("Found closing square bracket without matching opening square bracket")
+			return fmt.Errorf("Found \"]\" without matching \"[\"")
 		}
 
 		n, err := p.buildCombinationNode(op, operandStack)
@@ -424,7 +424,7 @@ func (p *ParserShunt) handleRightSquareBracket(operandStack *stack[operand], ope
 		p.pushNodeToOperandStack(n, operandStack, isComparisonOperator(op))
 	}
 
-	return fmt.Errorf("Found closing square bracket without matching opening square bracket")
+	return fmt.Errorf("Found \"]\" without matching \"[\"")
 }
 
 func (p *ParserShunt) getOperatorToProto(op Operator) *pb.CombinationNode {
@@ -575,7 +575,7 @@ func parseTimestampFunction(stream *TokenStream) (*pb.Node, error) {
 		return nil, fmt.Errorf("timestamp function requires a parameter")
 	}
 	if nextTok.Kind != TokenIdentifier {
-		return nil, fmt.Errorf("%v is not a valid timestamp parameter", nextTok)
+		return nil, fmt.Errorf("%s is not a valid timestamp parameter", describeToken(nextTok))
 	}
 
 	param := nextTok.Value.(string)
@@ -584,7 +584,7 @@ func parseTimestampFunction(stream *TokenStream) (*pb.Node, error) {
 		return nil, fmt.Errorf("timestamp function expects exactly one parameter")
 	}
 	if afterParam.Kind != TokenRightParen {
-		return nil, fmt.Errorf("expected closing parenthesis after timestamp parameter, got %v", afterParam)
+		return nil, fmt.Errorf("expected \")\" after timestamp parameter, got %s", describeToken(afterParam))
 	}
 
 	switch param {
@@ -614,6 +614,18 @@ func parseTimestampFunction(stream *TokenStream) (*pb.Node, error) {
 		}.Build(), nil
 	default:
 		return nil, fmt.Errorf("%q is not a valid timestamp parameter", param)
+	}
+}
+
+// describeToken formats tok for use in error messages. Operator and
+// punctuation tokens are quoted (e.g. `"+"`), consistent with the lexer's
+// errors; literals, identifiers and EOF use Token.String.
+func describeToken(tok Token) string {
+	switch tok.Kind {
+	case TokenEOF, TokenBool, TokenNumber, TokenIdentifier:
+		return tok.String()
+	default:
+		return fmt.Sprintf("%q", tok.Kind)
 	}
 }
 
@@ -823,7 +835,7 @@ func parseOperator(k TokenKind) (Operator, error) {
 	case TokenComma:
 		return OperatorComma, nil
 	}
-	return OperatorInvalid, fmt.Errorf("unknown operator %v", k)
+	return OperatorInvalid, fmt.Errorf("unknown operator %q", k)
 }
 
 // String implements fmt.Stringer.
