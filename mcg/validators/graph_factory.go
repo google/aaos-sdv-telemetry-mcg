@@ -15,6 +15,8 @@
 package validators
 
 import (
+	"fmt"
+
 	"sdv.googlesource.com/mcg/mcg/expressions"
 	"sdv.googlesource.com/mcg/mcg/graph"
 
@@ -97,5 +99,43 @@ func NewGraphForInferenceCycleChecks(mc *pb.MetricsConfig) *graph.Graph[string] 
 			}
 		}
 	}
+	return g
+}
+
+// Define a custom node that implements `fmt.Stringer`, so that error messages print a nicer representation than just
+// the index of an expression node.
+type ExpressionNode uint32
+
+func (e ExpressionNode) String() string {
+	return fmt.Sprintf("expression_nodes[%d]", e)
+}
+
+var _ fmt.Stringer = ExpressionNode(0)
+
+func NewGraphForExpressionNodeCyclesChecks(mc *pb.MetricsConfig) *graph.Graph[ExpressionNode] {
+	g := graph.NewGraph[ExpressionNode]()
+
+	for nodeIdx, node := range mc.GetExpressionNodes() {
+		nodeIdx := ExpressionNode(nodeIdx)
+		g.AddNode(nodeIdx)
+
+		switch node.WhichNodeType() {
+		case pb.Node_CombinationNode_case:
+			node := node.GetCombinationNode()
+			if node.HasLeftIndex() {
+				g.AddEdge(nodeIdx, ExpressionNode(node.GetLeftIndex()))
+			}
+			if node.HasRightIndex() {
+				g.AddEdge(nodeIdx, ExpressionNode(node.GetRightIndex()))
+			}
+		case pb.Node_FieldLeafNode_case:
+			node := node.GetFieldLeafNode()
+			if node.HasExpressionNodeIndex() {
+				g.AddEdge(nodeIdx, ExpressionNode(node.GetExpressionNodeIndex()))
+			}
+		default:
+		}
+	}
+
 	return g
 }

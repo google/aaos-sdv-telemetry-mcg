@@ -332,7 +332,6 @@ func (v *McValidator) printErrorList() {
 }
 
 func (v *McValidator) validateExpressionNodes() {
-	checkedExpressionNodes := map[int]bool{}
 	exprNodesLen := uint32(len(v.mc.GetExpressionNodes()))
 
 	for i, node := range v.mc.GetExpressionNodes() {
@@ -360,9 +359,13 @@ func (v *McValidator) validateExpressionNodes() {
 				}
 			}
 		}
+	}
 
-		if err := validateNoExpressionNodeCycles(i, map[int]bool{}, checkedExpressionNodes, v.mc.GetExpressionNodes()); err != nil {
-			v.ErrorList = append(v.ErrorList, err)
+	if _, err := NewGraphForExpressionNodeCyclesChecks(v.mc).StableTopologicalOrdering(); err != nil {
+		if cyclicGraphError, ok := err.(*graph.CyclicGraphError[ExpressionNode]); ok {
+			v.ErrorList = append(v.ErrorList, mcgerrors.CyclicDependency(cyclicGraphError.Error()))
+		} else {
+			v.ErrorList = append(v.ErrorList, mcgerrors.InternalFromError(err))
 		}
 	}
 }
@@ -394,50 +397,4 @@ func validateRightAndLeftChildReferences(idx int, node *pb.Node, exprNodesLen ui
 	}
 
 	return errorList
-}
-
-// validateNoExpressionNodeCycles is a recursive helper traversing through the expression nodes.
-// Note that expression nodes that refer to sources may cause cycles back to the same expression
-// node, but that is accepted. Field nodes only read the latest state of the source, so it's okay
-// for them to depend on the source that in turn uses them to initialize its state. In fact, it
-// is a feature that allows to accumulate data in aggregators by referring to themselves.
-func validateNoExpressionNodeCycles(currIdx int, visited, checkedExpressionNodes map[int]bool, exprNodes []*pb.Node) *mcgerrors.StatusError {
-	if currIdx >= len(exprNodes) {
-		// Return gracefully as this type of error is already checked as part of
-		// validateRightAndLeftChildReferences.
-		return nil
-	}
-	if visited[currIdx] {
-		return mcgerrors.CyclicDependency(fmt.Sprintf("expression_nodes[%d]", currIdx))
-	}
-	if checkedExpressionNodes[currIdx] {
-		return nil
-	}
-
-	visited[currIdx] = true
-	checkedExpressionNodes[currIdx] = true
-
-	if combNode := exprNodes[currIdx].GetCombinationNode(); combNode != nil {
-		if leftIdx := combNode.GetLeftIndex(); combNode.HasLeftIndex() {
-			if err := validateNoExpressionNodeCycles(int(leftIdx), visited, checkedExpressionNodes, exprNodes); err != nil {
-				return err
-			}
-		}
-
-		if rightIdx := combNode.GetRightIndex(); combNode.HasRightIndex() {
-			if err := validateNoExpressionNodeCycles(int(rightIdx), visited, checkedExpressionNodes, exprNodes); err != nil {
-				return err
-			}
-		}
-	}
-
-	if fieldNode := exprNodes[currIdx].GetFieldLeafNode(); fieldNode != nil {
-		if exprIdx := fieldNode.GetExpressionNodeIndex(); fieldNode.HasExpressionNodeIndex() {
-			if err := validateNoExpressionNodeCycles(int(exprIdx), visited, checkedExpressionNodes, exprNodes); err != nil {
-				return err
-			}
-		}
-	}
-
-	return nil
 }

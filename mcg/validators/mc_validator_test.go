@@ -473,7 +473,8 @@ func TestValidateExpressionNodesWithUnaryOperatorWithRightNodeFails(t *testing.T
 
 	validators.ValidateExpressionNodes(v)
 
-	if err := assertErrors(v,
+	if err := assertErrors(
+		v,
 		mcgerrors.UnaryOperatorExpressionNodeHasRightIndexSet(2),
 		mcgerrors.UnaryOperatorExpressionNodeHasRightIndexSet(3),
 		mcgerrors.UnaryOperatorExpressionNodeHasRightIndexSet(4),
@@ -515,7 +516,8 @@ func TestValidateExpressionNodesWithNecessaryRightOrLeftNodeMissingFails(t *test
 
 	validators.ValidateExpressionNodes(v)
 
-	if err := assertErrors(v,
+	if err := assertErrors(
+		v,
 		mcgerrors.NonUnaryCombinationExpressionNodeDoesntHaveRightIndexSet(1),
 		mcgerrors.CombinationExpressionNodeDoesntHaveLeftIndexSet(2),
 		mcgerrors.CombinationExpressionNodeDoesntHaveLeftIndexSet(3),
@@ -557,7 +559,8 @@ func TestValidateExpressionNodesWithInvalidNodeExpressionReferenceFails(t *testi
 
 	validators.ValidateExpressionNodes(v)
 
-	if err := assertErrors(v,
+	if err := assertErrors(
+		v,
 		mcgerrors.CombinationExpressionNodeWithInvalidExpressionNodeReference(1),
 		mcgerrors.CombinationExpressionNodeWithInvalidExpressionNodeReference(2),
 		mcgerrors.CombinationExpressionNodeWithInvalidExpressionNodeReference(3),
@@ -590,6 +593,45 @@ func TestValidateExpressionNodesWithInvalidSourceReferenceFails(t *testing.T) {
 	if len(v.ErrorList) != 1 || v.ErrorList[0].Status.Message != mcgerrors.ExpressionNodeWithInvalidSourceReference(0, "DataSourceName1").Status.Message {
 		validators.PrintErrorList(v)
 		t.Fatal("Validation of expression nodes should not pass if a node refers to a non-existent source.")
+	}
+}
+
+func TestValidateExpressionNodes_DiamondDAG(t *testing.T) {
+	// Diamond DAG (Root-first order so traversals hit shared sub-nodes before they are pre-memoized):
+	// Node 0: Combination referencing Node 1 and Node 2 (root)
+	// Node 1: Combination referencing Node 3 on both sides
+	// Node 2: Combination referencing Node 3 on both sides
+	// Node 3: Leaf constant
+	nodes := []*pb.Node{
+		pb.Node_builder{CombinationNode: pb.CombinationNode_builder{
+			ArithmeticOperator: pb.CombinationNode_ADD.Enum(),
+			LeftIndex:          proto.Uint32(1),
+			RightIndex:         proto.Uint32(2),
+		}.Build()}.Build(),
+		pb.Node_builder{CombinationNode: pb.CombinationNode_builder{
+			ArithmeticOperator: pb.CombinationNode_ADD.Enum(),
+			LeftIndex:          proto.Uint32(3),
+			RightIndex:         proto.Uint32(3),
+		}.Build()}.Build(),
+		pb.Node_builder{CombinationNode: pb.CombinationNode_builder{
+			ArithmeticOperator: pb.CombinationNode_MULTIPLY.Enum(),
+			LeftIndex:          proto.Uint32(3),
+			RightIndex:         proto.Uint32(3),
+		}.Build()}.Build(),
+		pb.Node_builder{ConstantLeafNode: pb.ConstantLeafNode_builder{
+			Int32Value: proto.Int32(42),
+		}.Build()}.Build(),
+	}
+
+	v := validators.NewMcValidator(pb.MetricsConfig_builder{
+		ExpressionNodes: nodes,
+	}.Build(), false)
+
+	validators.ValidateExpressionNodes(v)
+
+	if len(v.ErrorList) > 0 {
+		validators.PrintErrorList(v)
+		t.Fatalf("ValidateExpressionNodes() got unexpected errors = %v, want none", v.ErrorList)
 	}
 }
 
