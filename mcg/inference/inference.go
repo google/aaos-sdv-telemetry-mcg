@@ -91,18 +91,25 @@ type typeInference struct {
 func (ti *typeInference) infer() []error {
 	var errs []error
 
-	// Topologically sorting sources ensures that we infer the message types of an aggregator's
-	// dependencies before we try to infer the aggregator itself.
-	sortedSources, err := ti.topologicallySortedSources()
+	g := validators.NewGraphForInferenceCycleChecks(ti.config)
+	// Topologically sorting sources and message builder expression nodes ensures that
+	// we infer dependencies before the nodes/aggregators that depend on them.
+	orderedGraphNodes, err := g.StableReverseTopologicalOrdering()
 	if err != nil {
 		// It does not make sense to continue if this fails, since all following errors may be
-		// caused by us not being able to topologically sort sources.
-		return []error{fmt.Errorf("Cyclic dependency between sources and/or triggers detected: %w", err)}
+		// caused by us not being able to topologically sort sources and message builders.
+		return []error{fmt.Errorf("Cyclic dependency between sources and/or message builders detected: %w", err)}
 	}
 
-	for _, source := range sortedSources {
-		if agg := source.GetAggregator(); agg != nil {
-			if err := ti.processMessageBuilder(agg.GetMessageBuilder(), source.GetName(), "aggregator"); err != nil {
+	for _, gn := range orderedGraphNodes {
+		if sourceName, ok := gn.SourceName(); ok {
+			if agg := ti.sourcesByName[sourceName].GetAggregator(); agg != nil {
+				if err := ti.processMessageBuilder(agg.GetMessageBuilder(), sourceName, "aggregator"); err != nil {
+					errs = append(errs, err)
+				}
+			}
+		} else if mbIdx, ok := gn.MessageBuilderIndex(); ok {
+			if err := ti.processExpressionNodeMessageBuilder(mbIdx); err != nil {
 				errs = append(errs, err)
 			}
 		}
@@ -161,32 +168,13 @@ func (ti *typeInference) getSourceMessageName(sourceName string) (protoreflect.F
 	return "", fmt.Errorf("Source %q has unknown source type", sourceName)
 }
 
-func (ti *typeInference) topologicallySortedSources() ([]*pb.Source, error) {
-	g := validators.NewGraphForInferenceCycleChecks(ti.config)
-	orderedSourceNames, err := g.StableReverseTopologicalOrdering()
-	if err != nil {
-		return nil, err
-	}
-	// nameToOrderIdx will contain the index in the topological sort order of each source.
-	nameToOrderIdx := make(map[string]int)
-	for idx, sourceName := range orderedSourceNames {
-		nameToOrderIdx[sourceName] = idx
-	}
-
-	sources := slices.Clone(ti.config.GetSources())
-	slices.SortFunc(sources, func(a, b *pb.Source) int {
-		return nameToOrderIdx[a.GetName()] - nameToOrderIdx[b.GetName()]
-	})
-	return sources, nil
-}
-
 func (ti *typeInference) processMessageBuilder(msgBuilder *pb.ProtoMessageBuilder, name string, entityType string) error {
 	if msgBuilder.GetMessageType() == "" {
 		if err := ti.generateAndRegisterAdhocSchema(msgBuilder, name); err != nil {
 			return fmt.Errorf("Failed to generate ad-hoc schema for %s %q: %w", entityType, name, err)
 		}
 	} else {
-		if err := ti.validatePredefinedMessageType(msgBuilder); err != nil {
+		if err := ti.validatePredefinedMessageType(msgBuilder.GetMessageType()); err != nil {
 			return fmt.Errorf("Invalid predefined message type for %s %q: %w", entityType, name, err)
 		}
 	}
@@ -231,8 +219,7 @@ func (ti *typeInference) generateAndRegisterAdhocSchema(msgBuilder *pb.ProtoMess
 	return nil
 }
 
-func (ti *typeInference) validatePredefinedMessageType(msgBuilder *pb.ProtoMessageBuilder) error {
-	msgTypeName := msgBuilder.GetMessageType()
+func (ti *typeInference) validatePredefinedMessageType(msgTypeName string) error {
 	fullName := protoreflect.FullName(strings.TrimPrefix(msgTypeName, "."))
 
 	if !fullName.IsValid() {
@@ -241,7 +228,7 @@ func (ti *typeInference) validatePredefinedMessageType(msgBuilder *pb.ProtoMessa
 
 	msgType, err := ti.typeResolver.FindMessageByName(fullName)
 	if err != nil {
-		return fmt.Errorf("No definition found for message type %q.", msgTypeName)
+		return fmt.Errorf("no definition found for message type %q: %w", msgTypeName, err)
 	}
 
 	if !ti.IsTypeInOutputDescriptors(msgType.Descriptor().FullName()) {
@@ -315,6 +302,70 @@ func (ti *typeInference) findIdenticalAdhocMessageIgnoringName(desc *descriptorp
 			return msg
 		}
 	}
+	return nil
+}
+
+// processExpressionNodeMessageBuilder infers or validates the schema for an inline MessageBuilderNode.
+func (ti *typeInference) processExpressionNodeMessageBuilder(nodeIdx uint32) error {
+	node := ti.config.GetExpressionNodes()[nodeIdx].GetMessageBuilderNode()
+	if messageType := node.GetMessageType(); messageType != "" {
+		if err := ti.validatePredefinedMessageType(messageType); err != nil {
+			return fmt.Errorf("failed to process message builder expression node %d: %w", nodeIdx, err)
+		}
+	} else {
+		// The parentName is used as part of the name of the generated adhoc
+		// message. Since expression nodes have no names (as opposed to data
+		// sources), we make up a name based on the node index.
+		parentName := fmt.Sprintf("MsgBuilderNode%d", nodeIdx)
+		if err := ti.generateAndRegisterAdhocSchemaForExpression(node, parentName); err != nil {
+			return fmt.Errorf("failed to process message builder expression node %d: %w", nodeIdx, err)
+		}
+	}
+	return nil
+}
+
+// generateAndRegisterAdhocSchemaForExpression creates and registers an ad-hoc DescriptorProto for an inline MessageBuilderNode.
+func (ti *typeInference) generateAndRegisterAdhocSchemaForExpression(mbNode *pb.MessageBuilderNode, parentName string) error {
+	name := fmt.Sprintf(".%s.%s", AdhocPackage, parentName)
+	mbNode.SetMessageType(name)
+
+	// Check if a schema with this name was already generated or provided (to avoid redundant generation)
+	if ti.IsTypeInOutputDescriptors(protoreflect.FullName(strings.TrimPrefix(name, "."))) {
+		return nil
+	}
+
+	descriptor := &descriptorpb.DescriptorProto{Name: proto.String(parentName)}
+
+	var errs []error
+	for i, fa := range mbNode.GetFieldAssignments() {
+		fieldDesc := &descriptorpb.FieldDescriptorProto{
+			Name:   proto.String(fa.GetFieldName()),
+			Number: proto.Int32(int32(i + 1)),
+		}
+
+		nodeIdx := fa.GetExpressionNodeIndex()
+		inferredTypeDesc, err := ti.expressionResolver.Resolve(nodeIdx)
+		if err != nil {
+			errs = append(errs, fmt.Errorf("failed to infer field type for expression node %q in field assignment %q: %w", ti.config.GetExpressionNodes()[nodeIdx].String(), fa.GetFieldName(), err))
+			continue
+		}
+		if err := ti.normalizeAndTrackType(inferredTypeDesc); err != nil {
+			errs = append(errs, err)
+			continue
+		}
+		fieldDesc.Type = inferredTypeDesc.Type
+		fieldDesc.TypeName = inferredTypeDesc.TypeName
+		fieldDesc.Label = inferredTypeDesc.Label
+
+		descriptor.Field = append(descriptor.Field, fieldDesc)
+	}
+	if err := errors.Join(errs...); err != nil {
+		mbNode.SetMessageType("")
+		return err
+	}
+
+	finalName := ti.AddOrDeduplicateAdhocMessage(descriptor)
+	mbNode.SetMessageType(finalName)
 	return nil
 }
 

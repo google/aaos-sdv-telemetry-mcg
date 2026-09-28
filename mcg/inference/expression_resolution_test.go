@@ -960,3 +960,125 @@ func TestResolveFieldLeafNodeWithExpressionIndex(t *testing.T) {
 		})
 	}
 }
+
+func TestResolve_MessageBuilderNode(t *testing.T) {
+	er := NewExpressionResolver(
+		[]*pb.Node{
+			// Index 0: MessageBuilderNode
+			pb.Node_builder{
+				MessageBuilderNode: pb.MessageBuilderNode_builder{
+					MessageType: proto.String("pkg.Message"),
+					FieldAssignments: []*pb.MessageBuilderNode_FieldAssignment{
+						pb.MessageBuilderNode_FieldAssignment_builder{
+							FieldName:           proto.String("int_field"),
+							ExpressionNodeIndex: proto.Uint32(1),
+						}.Build(),
+					},
+				}.Build(),
+			}.Build(),
+			// Index 1: Constant leaf node (yields INT32)
+			pb.Node_builder{
+				ConstantLeafNode: pb.ConstantLeafNode_builder{
+					Int32Value: proto.Int32(42),
+				}.Build(),
+			}.Build(),
+			// Index 2: Postfix access on MessageBuilderNode (accessing int_field)
+			pb.Node_builder{
+				FieldLeafNode: pb.FieldLeafNode_builder{
+					ExpressionNodeIndex: proto.Uint32(0),
+					FieldNames:          []string{"int_field"},
+				}.Build(),
+			}.Build(),
+		},
+		func(sourceName string) (protoreflect.FullName, error) {
+			return "", fmt.Errorf("unexpected call to getSourceMessageName")
+		},
+		func(name protoreflect.FullName) *descriptorpb.DescriptorProto {
+			if name == "pkg.Message" {
+				return &descriptorpb.DescriptorProto{
+					Name: proto.String("Message"),
+					Field: []*descriptorpb.FieldDescriptorProto{
+						{
+							Name:   proto.String("int_field"),
+							Number: proto.Int32(1),
+							Type:   descriptorpb.FieldDescriptorProto_TYPE_INT32.Enum(),
+						},
+					},
+				}
+			}
+			return nil
+		},
+	)
+
+	tests := []struct {
+		name    string
+		nodeIdx uint32
+		want    *descriptorpb.FieldDescriptorProto
+	}{
+		{
+			name:    "message builder",
+			nodeIdx: 0,
+			want: &descriptorpb.FieldDescriptorProto{
+				Type:     descriptorpb.FieldDescriptorProto_TYPE_MESSAGE.Enum(),
+				TypeName: proto.String(".pkg.Message"),
+			},
+		},
+		{
+			name:    "postfix access on message builder",
+			nodeIdx: 2,
+			want: &descriptorpb.FieldDescriptorProto{
+				Type: descriptorpb.FieldDescriptorProto_TYPE_INT32.Enum(),
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			desc, err := er.Resolve(tt.nodeIdx)
+			if err != nil {
+				t.Fatalf("Resolve(%d) failed: %v", tt.nodeIdx, err)
+			}
+			if diff := cmp.Diff(tt.want, desc, protocmp.Transform()); diff != "" {
+				t.Errorf("Resolve(%d) returned unexpected descriptor diff (-want +got):\n%s", tt.nodeIdx, diff)
+			}
+		})
+	}
+}
+
+func TestResolve_MessageBuilderNodeFails(t *testing.T) {
+	er := NewExpressionResolver(
+		[]*pb.Node{
+			// Index 0: MessageBuilderNode without `MessageType`
+			pb.Node_builder{
+				MessageBuilderNode: pb.MessageBuilderNode_builder{
+					FieldAssignments: []*pb.MessageBuilderNode_FieldAssignment{
+						pb.MessageBuilderNode_FieldAssignment_builder{
+							FieldName:           proto.String("int_field"),
+							ExpressionNodeIndex: proto.Uint32(1),
+						}.Build(),
+					},
+				}.Build(),
+			}.Build(),
+			// Index 1: Constant leaf node (yields INT32)
+			pb.Node_builder{
+				ConstantLeafNode: pb.ConstantLeafNode_builder{
+					Int32Value: proto.Int32(42),
+				}.Build(),
+			}.Build(),
+		},
+		func(sourceName string) (protoreflect.FullName, error) {
+			return "", fmt.Errorf("unexpected call to getSourceMessageName")
+		},
+		func(name protoreflect.FullName) *descriptorpb.DescriptorProto {
+			return nil
+		},
+	)
+
+	_, err := er.Resolve(0)
+	if err == nil {
+		t.Fatal("Resolve(0) = _, nil, want _, err")
+	}
+	if !strings.Contains(err.Error(), "message_type of message builder node has not been inferred yet") {
+		t.Errorf("Resolve(0) error = %q, want error containing %q", err.Error(), "message_type of message builder node has not been inferred yet")
+	}
+}

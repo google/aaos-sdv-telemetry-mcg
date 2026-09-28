@@ -339,25 +339,53 @@ func (v *McValidator) validateExpressionNodes() {
 			v.ErrorList = append(v.ErrorList, errs...)
 		}
 
-		// Field leaf nodes should only refer to existing sources or valid expression nodes.
-		if fieldLeafNode := node.GetFieldLeafNode(); fieldLeafNode != nil {
-			hasSource := fieldLeafNode.GetSourceName() != ""
-			hasExpr := fieldLeafNode.HasExpressionNodeIndex()
+		switch node.WhichNodeType() {
+		case pb.Node_FieldLeafNode_case:
+			// Field leaf nodes should only refer to existing sources or valid expression nodes.
+			node := node.GetFieldLeafNode()
 
+			hasSource := node.GetSourceName() != ""
+			hasExpr := node.HasExpressionNodeIndex()
 			if hasSource && hasExpr {
 				v.ErrorList = append(v.ErrorList, mcgerrors.FieldLeafNodeWithBothSourceAndExpressionIndexSet(i))
 			} else if !hasSource && !hasExpr {
 				v.ErrorList = append(v.ErrorList, mcgerrors.FieldLeafNodeWithNeitherSourceNorExpressionIndexSet(i))
 			} else if hasExpr {
-				exprIdx := fieldLeafNode.GetExpressionNodeIndex()
+				exprIdx := node.GetExpressionNodeIndex()
 				if exprIdx >= exprNodesLen {
 					v.ErrorList = append(v.ErrorList, mcgerrors.FieldLeafNodeWithInvalidExpressionNodeReference(exprIdx))
 				}
 			} else {
-				if v.sourcesMap[fieldLeafNode.GetSourceName()] == nil {
-					v.ErrorList = append(v.ErrorList, mcgerrors.ExpressionNodeWithInvalidSourceReference(i, fieldLeafNode.GetSourceName()))
+				if v.sourcesMap[node.GetSourceName()] == nil {
+					v.ErrorList = append(v.ErrorList, mcgerrors.ExpressionNodeWithInvalidSourceReference(i, node.GetSourceName()))
 				}
 			}
+		case pb.Node_MessageBuilderNode_case:
+			node := node.GetMessageBuilderNode()
+
+			seenFields := make(map[string]struct{})
+			for _, fa := range node.GetFieldAssignments() {
+				if !fa.HasFieldName() || fa.GetFieldName() == "" {
+					v.ErrorList = append(v.ErrorList, mcgerrors.MessageBuilderNodeFieldAssignmentMissingFieldName(i))
+				} else if _, ok := seenFields[fa.GetFieldName()]; ok {
+					v.ErrorList = append(v.ErrorList, mcgerrors.MessageBuilderNodeDuplicateFieldName(i, fa.GetFieldName()))
+				} else {
+					seenFields[fa.GetFieldName()] = struct{}{}
+				}
+				if !fa.HasExpressionNodeIndex() {
+					v.ErrorList = append(v.ErrorList, mcgerrors.MessageBuilderNodeFieldAssignmentMissingExpressionNodeIndex(i, fa.GetFieldName()))
+				} else if fa.GetExpressionNodeIndex() >= exprNodesLen {
+					v.ErrorList = append(v.ErrorList, mcgerrors.MessageBuilderNodeFieldAssignmentInvalidExpressionNodeIndex(i, fa.GetFieldName(), fa.GetExpressionNodeIndex()))
+				}
+			}
+			if messageType := node.GetMessageType(); messageType != "" {
+				if v.typeResolver == nil {
+					v.ErrorList = append(v.ErrorList, mcgerrors.NoTypeResolver(messageType))
+				} else if _, err := v.typeResolver.FindMessageByName(protoreflect.FullName(messageType)); err != nil {
+					v.ErrorList = append(v.ErrorList, mcgerrors.UnknownMessageType(messageType))
+				}
+			}
+		default:
 		}
 	}
 

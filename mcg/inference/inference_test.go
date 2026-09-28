@@ -15,7 +15,9 @@
 package inference_test
 
 import (
+	"fmt"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -734,5 +736,556 @@ func TestAdhocMessageDeduplication(t *testing.T) {
 
 	if diff := cmp.Diff(wantAdhocDp, adhocDp, protocmp.Transform()); diff != "" {
 		t.Errorf("Adhoc FileDescriptorProto mismatch (-want +got):\n%s", diff)
+	}
+}
+
+func TestInfer_MsgBuilderNodeAdhoc(t *testing.T) {
+	fd := &descriptorpb.FileDescriptorProto{
+		Name:    proto.String("main.proto"),
+		Package: proto.String("my.package"),
+		Syntax:  proto.String("proto3"),
+		MessageType: []*descriptorpb.DescriptorProto{
+			{
+				Name: proto.String("MyMessage"),
+				Field: []*descriptorpb.FieldDescriptorProto{
+					{
+						Name:   proto.String("speed"),
+						Number: proto.Int32(1),
+						Type:   descriptorpb.FieldDescriptorProto_TYPE_FLOAT.Enum(),
+					},
+				},
+			},
+		},
+	}
+	fdSet := &descriptorpb.FileDescriptorSet{File: []*descriptorpb.FileDescriptorProto{fd}}
+	resolver, err := type_resolvers.NewEnrichedTypeResolverFromFileDescriptorSet(fdSet)
+	if err != nil {
+		t.Fatalf("Failed to create type resolver: %v", err)
+	}
+
+	config := pb.MetricsConfig_builder{
+		ExpressionNodes: []*pb.Node{
+			// Node 0: FieldLeafNode accessing speed (FLOAT)
+			pb.Node_builder{
+				FieldLeafNode: pb.FieldLeafNode_builder{
+					SourceName: "my_data_source",
+					FieldNames: []string{"speed"},
+				}.Build(),
+			}.Build(),
+			// Node 1: ConstantLeafNode (INT32)
+			pb.Node_builder{
+				ConstantLeafNode: pb.ConstantLeafNode_builder{
+					Int32Value: proto.Int32(100),
+				}.Build(),
+			}.Build(),
+			// Node 2: Untyped MessageBuilderNode
+			pb.Node_builder{
+				MessageBuilderNode: pb.MessageBuilderNode_builder{
+					FieldAssignments: []*pb.MessageBuilderNode_FieldAssignment{
+						pb.MessageBuilderNode_FieldAssignment_builder{
+							FieldName:           proto.String("inferred_speed"),
+							ExpressionNodeIndex: proto.Uint32(0),
+						}.Build(),
+						pb.MessageBuilderNode_FieldAssignment_builder{
+							FieldName:           proto.String("limit"),
+							ExpressionNodeIndex: proto.Uint32(1),
+						}.Build(),
+					},
+				}.Build(),
+			}.Build(),
+		},
+		Sources: []*pb.Source{
+			pb.Source_builder{
+				Name: "my_data_source",
+				DataSource: pb.DataSource_builder{
+					SourceIdentifier: "my_data_source_identifier",
+				}.Build(),
+			}.Build(),
+		},
+	}.Build()
+
+	errs := inference.Infer(config, *resolver, map[string]string{
+		"my_data_source_identifier": ".my.package.MyMessage",
+	})
+	if len(errs) > 0 {
+		t.Fatalf("Infer() returned unexpected errors: %v", errs)
+	}
+
+	mbNode := config.GetExpressionNodes()[2].GetMessageBuilderNode()
+	wantMsgType := ".aaos.sdv.telemetry.adhoc.MsgBuilderNode2"
+	if mbNode.GetMessageType() != wantMsgType {
+		t.Errorf("Expected MessageType %q, got %q", wantMsgType, mbNode.GetMessageType())
+	}
+
+	var adhocDp *descriptorpb.FileDescriptorProto
+	for _, dp := range config.GetDescriptorProtos() {
+		if dp.GetName() == "adhoc.proto" {
+			adhocDp = dp
+			break
+		}
+	}
+	if adhocDp == nil {
+		t.Fatalf("adhoc.proto not found in output descriptor protos")
+	}
+
+	var foundMsg *descriptorpb.DescriptorProto
+	for _, msg := range adhocDp.GetMessageType() {
+		if msg.GetName() == "MsgBuilderNode2" {
+			foundMsg = msg
+			break
+		}
+	}
+	if foundMsg == nil {
+		t.Fatalf("MsgBuilderNode2 not found in adhoc.proto")
+	}
+
+	wantFields := []*descriptorpb.FieldDescriptorProto{
+		{
+			Name:   proto.String("inferred_speed"),
+			Number: proto.Int32(1),
+			Type:   descriptorpb.FieldDescriptorProto_TYPE_FLOAT.Enum(),
+		},
+		{
+			Name:   proto.String("limit"),
+			Number: proto.Int32(2),
+			Type:   descriptorpb.FieldDescriptorProto_TYPE_INT32.Enum(),
+		},
+	}
+	if diff := cmp.Diff(wantFields, foundMsg.GetField(), protocmp.Transform()); diff != "" {
+		t.Errorf("Adhoc fields mismatch (-want +got):\n%s", diff)
+	}
+}
+
+func TestInfer_MsgBuilderNodeDeduplication(t *testing.T) {
+	fd := &descriptorpb.FileDescriptorProto{
+		Name:    proto.String("main.proto"),
+		Package: proto.String("my.package"),
+		Syntax:  proto.String("proto3"),
+		MessageType: []*descriptorpb.DescriptorProto{
+			{
+				Name: proto.String("MyMessage"),
+				Field: []*descriptorpb.FieldDescriptorProto{
+					{
+						Name:   proto.String("val"),
+						Number: proto.Int32(1),
+						Type:   descriptorpb.FieldDescriptorProto_TYPE_INT32.Enum(),
+					},
+				},
+			},
+		},
+	}
+	fdSet := &descriptorpb.FileDescriptorSet{File: []*descriptorpb.FileDescriptorProto{fd}}
+	resolver, err := type_resolvers.NewEnrichedTypeResolverFromFileDescriptorSet(fdSet)
+	if err != nil {
+		t.Fatalf("Failed to create type resolver: %v", err)
+	}
+
+	config := pb.MetricsConfig_builder{
+		ExpressionNodes: []*pb.Node{
+			// Node 0: ConstantLeafNode
+			pb.Node_builder{
+				ConstantLeafNode: pb.ConstantLeafNode_builder{
+					Int32Value: proto.Int32(10),
+				}.Build(),
+			}.Build(),
+			// Node 1: MessageBuilderNode
+			pb.Node_builder{
+				MessageBuilderNode: pb.MessageBuilderNode_builder{
+					FieldAssignments: []*pb.MessageBuilderNode_FieldAssignment{
+						pb.MessageBuilderNode_FieldAssignment_builder{
+							FieldName:           proto.String("count"),
+							ExpressionNodeIndex: proto.Uint32(0),
+						}.Build(),
+					},
+				}.Build(),
+			}.Build(),
+			// Node 2: Another identical MessageBuilderNode
+			pb.Node_builder{
+				MessageBuilderNode: pb.MessageBuilderNode_builder{
+					FieldAssignments: []*pb.MessageBuilderNode_FieldAssignment{
+						pb.MessageBuilderNode_FieldAssignment_builder{
+							FieldName:           proto.String("count"),
+							ExpressionNodeIndex: proto.Uint32(0),
+						}.Build(),
+					},
+				}.Build(),
+			}.Build(),
+		},
+	}.Build()
+
+	errs := inference.Infer(config, *resolver, make(map[string]string))
+	if len(errs) > 0 {
+		t.Fatalf("Infer() returned unexpected errors: %v", errs)
+	}
+
+	mb1 := config.GetExpressionNodes()[1].GetMessageBuilderNode().GetMessageType()
+	mb2 := config.GetExpressionNodes()[2].GetMessageBuilderNode().GetMessageType()
+	if mb1 != mb2 {
+		t.Errorf("Expected identical MessageBuilderNodes to share deduplicated message type, got %q and %q", mb1, mb2)
+	}
+}
+
+func TestInfer_MsgBuilderNodePredefined(t *testing.T) {
+	fd := &descriptorpb.FileDescriptorProto{
+		Name:    proto.String("main.proto"),
+		Package: proto.String("my.package"),
+		Syntax:  proto.String("proto3"),
+		MessageType: []*descriptorpb.DescriptorProto{
+			{
+				Name: proto.String("TargetMessage"),
+				Field: []*descriptorpb.FieldDescriptorProto{
+					{
+						Name:   proto.String("val"),
+						Number: proto.Int32(1),
+						Type:   descriptorpb.FieldDescriptorProto_TYPE_INT32.Enum(),
+					},
+				},
+			},
+		},
+	}
+	fdSet := &descriptorpb.FileDescriptorSet{File: []*descriptorpb.FileDescriptorProto{fd}}
+	resolver, err := type_resolvers.NewEnrichedTypeResolverFromFileDescriptorSet(fdSet)
+	if err != nil {
+		t.Fatalf("Failed to create type resolver: %v", err)
+	}
+
+	config := pb.MetricsConfig_builder{
+		ExpressionNodes: []*pb.Node{
+			pb.Node_builder{
+				MessageBuilderNode: pb.MessageBuilderNode_builder{
+					MessageType: proto.String(".my.package.TargetMessage"),
+				}.Build(),
+			}.Build(),
+		},
+	}.Build()
+
+	errs := inference.Infer(config, *resolver, make(map[string]string))
+	if len(errs) > 0 {
+		t.Fatalf("Infer() returned unexpected errors: %v", errs)
+	}
+
+	// Verify TargetMessage descriptor is retained in output descriptors
+	found := false
+	for _, dp := range config.GetDescriptorProtos() {
+		for _, msg := range dp.GetMessageType() {
+			if msg.GetName() == "TargetMessage" {
+				found = true
+			}
+		}
+	}
+	if !found {
+		t.Errorf("Expected TargetMessage to be retained in output descriptors")
+	}
+}
+
+func TestInfer_ExpressionMessageBuilderPredefinedUnknownFails(t *testing.T) {
+	fd := &descriptorpb.FileDescriptorProto{
+		Name:    proto.String("main.proto"),
+		Package: proto.String("my.package"),
+		Syntax:  proto.String("proto3"),
+	}
+	fdSet := &descriptorpb.FileDescriptorSet{File: []*descriptorpb.FileDescriptorProto{fd}}
+	resolver, err := type_resolvers.NewEnrichedTypeResolverFromFileDescriptorSet(fdSet)
+	if err != nil {
+		t.Fatalf("type_resolvers.NewEnrichedTypeResolverFromFileDescriptorSet() error = %v, want nil", err)
+	}
+
+	config := pb.MetricsConfig_builder{
+		ExpressionNodes: []*pb.Node{
+			pb.Node_builder{
+				MessageBuilderNode: pb.MessageBuilderNode_builder{
+					MessageType: proto.String(".my.package.NonExistent"),
+				}.Build(),
+			}.Build(),
+		},
+	}.Build()
+
+	errs := inference.Infer(config, *resolver, make(map[string]string))
+	if len(errs) == 0 {
+		t.Fatal("Infer() succeeded, want error")
+	}
+	const wantSubstr = `no definition found for message type ".my.package.NonExistent"`
+	found := false
+	for _, err := range errs {
+		if strings.Contains(err.Error(), wantSubstr) {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Errorf("Infer() errors = %v, want error containing %q", errs, wantSubstr)
+	}
+}
+
+func TestInfer_ExpressionMessageBuilderOutOfOrder(t *testing.T) {
+	// Node 0: Parent MessageBuilder referencing child at Node 1
+	// Node 1: Child MessageBuilder referencing leaf at Node 2
+	// Node 2: Constant Leaf
+	config := pb.MetricsConfig_builder{
+		ExpressionNodes: []*pb.Node{
+			pb.Node_builder{
+				MessageBuilderNode: pb.MessageBuilderNode_builder{
+					FieldAssignments: []*pb.MessageBuilderNode_FieldAssignment{
+						pb.MessageBuilderNode_FieldAssignment_builder{
+							FieldName:           proto.String("child"),
+							ExpressionNodeIndex: proto.Uint32(1),
+						}.Build(),
+					},
+				}.Build(),
+			}.Build(),
+			pb.Node_builder{
+				MessageBuilderNode: pb.MessageBuilderNode_builder{
+					FieldAssignments: []*pb.MessageBuilderNode_FieldAssignment{
+						pb.MessageBuilderNode_FieldAssignment_builder{
+							FieldName:           proto.String("val"),
+							ExpressionNodeIndex: proto.Uint32(2),
+						}.Build(),
+					},
+				}.Build(),
+			}.Build(),
+			pb.Node_builder{
+				ConstantLeafNode: pb.ConstantLeafNode_builder{
+					Int32Value: proto.Int32(123),
+				}.Build(),
+			}.Build(),
+		},
+	}.Build()
+
+	resolver, err := type_resolvers.NewEnrichedTypeResolverFromFileDescriptorSet(&descriptorpb.FileDescriptorSet{})
+	if err != nil {
+		t.Fatalf("type_resolvers.NewEnrichedTypeResolverFromFileDescriptorSet() error = %v, want nil", err)
+	}
+	errs := inference.Infer(config, *resolver, make(map[string]string))
+	if len(errs) > 0 {
+		t.Fatalf("Infer() error = %v, want none", errs)
+	}
+
+	node0Type := config.GetExpressionNodes()[0].GetMessageBuilderNode().GetMessageType()
+	node1Type := config.GetExpressionNodes()[1].GetMessageBuilderNode().GetMessageType()
+	if node0Type == "" || node1Type == "" {
+		t.Errorf("MessageTypes = %q, %q, want both non-empty", node0Type, node1Type)
+	}
+}
+
+func TestInfer_ExpressionMessageBuilderPreexistingAdhocName(t *testing.T) {
+	// Create config where adhoc descriptor already exists with MsgBuilderNode0
+	existingAdhoc := &descriptorpb.FileDescriptorProto{
+		Name:    proto.String("adhoc.proto"),
+		Package: proto.String(inference.AdhocPackage),
+		MessageType: []*descriptorpb.DescriptorProto{
+			{
+				Name: proto.String("MsgBuilderNode0"),
+			},
+		},
+	}
+
+	config := pb.MetricsConfig_builder{
+		DescriptorProtos: []*descriptorpb.FileDescriptorProto{existingAdhoc},
+		ExpressionNodes: []*pb.Node{
+			pb.Node_builder{
+				MessageBuilderNode: pb.MessageBuilderNode_builder{
+					FieldAssignments: []*pb.MessageBuilderNode_FieldAssignment{
+						pb.MessageBuilderNode_FieldAssignment_builder{
+							FieldName:           proto.String("x"),
+							ExpressionNodeIndex: proto.Uint32(1),
+						}.Build(),
+					},
+				}.Build(),
+			}.Build(),
+			pb.Node_builder{
+				ConstantLeafNode: pb.ConstantLeafNode_builder{
+					Int32Value: proto.Int32(10),
+				}.Build(),
+			}.Build(),
+		},
+	}.Build()
+
+	resolver, err := type_resolvers.NewEnrichedTypeResolverFromFileDescriptorSet(&descriptorpb.FileDescriptorSet{})
+	if err != nil {
+		t.Fatalf("type_resolvers.NewEnrichedTypeResolverFromFileDescriptorSet() error = %v, want nil", err)
+	}
+	errs := inference.Infer(config, *resolver, make(map[string]string))
+	if len(errs) > 0 {
+		t.Fatalf("Infer() error = %v, want none", errs)
+	}
+
+	mbType := config.GetExpressionNodes()[0].GetMessageBuilderNode().GetMessageType()
+	expectedType := fmt.Sprintf(".%s.MsgBuilderNode0", inference.AdhocPackage)
+	if mbType != expectedType {
+		t.Errorf("MessageType = %q, want %q", mbType, expectedType)
+	}
+}
+
+func TestInfer_MsgBuilderNodeInterleavedWithAggregators(t *testing.T) {
+	fd := &descriptorpb.FileDescriptorProto{
+		Name:    proto.String("main.proto"),
+		Package: proto.String("my.package"),
+		Syntax:  proto.String("proto3"),
+		MessageType: []*descriptorpb.DescriptorProto{
+			{
+				Name: proto.String("RawData"),
+				Field: []*descriptorpb.FieldDescriptorProto{
+					{
+						Name:   proto.String("speed"),
+						Number: proto.Int32(1),
+						Type:   descriptorpb.FieldDescriptorProto_TYPE_FLOAT.Enum(),
+					},
+				},
+			},
+		},
+	}
+	fdSet := &descriptorpb.FileDescriptorSet{File: []*descriptorpb.FileDescriptorProto{fd}}
+	resolver, err := type_resolvers.NewEnrichedTypeResolverFromFileDescriptorSet(fdSet)
+	if err != nil {
+		t.Fatalf("Failed to create type resolver: %v", err)
+	}
+
+	// Chain: agg_2 -> MB(1) -> agg_1 -> raw_source
+	config := pb.MetricsConfig_builder{
+		Sources: []*pb.Source{
+			// raw data source
+			pb.Source_builder{
+				Name: "raw_source",
+				DataSource: pb.DataSource_builder{
+					SourceIdentifier: "raw_ident",
+				}.Build(),
+			}.Build(),
+			// agg_1: aggregates raw_source.speed (expression node 2)
+			pb.Source_builder{
+				Name: "agg_1",
+				Aggregator: pb.Aggregator_builder{
+					TriggerNames: []string{"trig_1"},
+					MessageBuilder: pb.ProtoMessageBuilder_builder{
+						FieldAssignments: []*pb.ProtoMessageBuilder_FieldAssignment{
+							pb.ProtoMessageBuilder_FieldAssignment_builder{
+								FieldName: "agg1_speed",
+								NoAggregation: pb.ProtoMessageBuilder_FieldAssignment_NoAggregation_builder{
+									ExpressionNodeIndex: proto.Uint32(2),
+								}.Build(),
+							}.Build(),
+						},
+					}.Build(),
+				}.Build(),
+			}.Build(),
+			// agg_2: aggregates MB(1)
+			pb.Source_builder{
+				Name: "agg_2",
+				Aggregator: pb.Aggregator_builder{
+					TriggerNames: []string{"trig_2"},
+					MessageBuilder: pb.ProtoMessageBuilder_builder{
+						FieldAssignments: []*pb.ProtoMessageBuilder_FieldAssignment{
+							pb.ProtoMessageBuilder_FieldAssignment_builder{
+								FieldName: "agg2_msg",
+								NoAggregation: pb.ProtoMessageBuilder_FieldAssignment_NoAggregation_builder{
+									ExpressionNodeIndex: proto.Uint32(1),
+								}.Build(),
+							}.Build(),
+						},
+					}.Build(),
+				}.Build(),
+			}.Build(),
+		},
+		ExpressionNodes: []*pb.Node{
+			// Node 0: FieldLeafNode accessing agg_1.agg1_speed
+			pb.Node_builder{
+				FieldLeafNode: pb.FieldLeafNode_builder{
+					SourceName: "agg_1",
+					FieldNames: []string{"agg1_speed"},
+				}.Build(),
+			}.Build(),
+			// Node 1: MessageBuilderNode assigning inner_speed = Node 0 (agg_1.agg1_speed)
+			pb.Node_builder{
+				MessageBuilderNode: pb.MessageBuilderNode_builder{
+					FieldAssignments: []*pb.MessageBuilderNode_FieldAssignment{
+						pb.MessageBuilderNode_FieldAssignment_builder{
+							FieldName:           proto.String("inner_speed"),
+							ExpressionNodeIndex: proto.Uint32(0),
+						}.Build(),
+					},
+				}.Build(),
+			}.Build(),
+			// Node 2: FieldLeafNode accessing raw_source.speed
+			pb.Node_builder{
+				FieldLeafNode: pb.FieldLeafNode_builder{
+					SourceName: "raw_source",
+					FieldNames: []string{"speed"},
+				}.Build(),
+			}.Build(),
+		},
+	}.Build()
+
+	errs := inference.Infer(config, *resolver, map[string]string{
+		"raw_ident": ".my.package.RawData",
+	})
+	if len(errs) > 0 {
+		t.Fatalf("Infer() returned unexpected errors: %v", errs)
+	}
+
+	// Verify agg_1 schema was inferred
+	agg1Type := config.GetSources()[1].GetAggregator().GetMessageBuilder().GetMessageType()
+	if agg1Type == "" {
+		t.Error("agg_1 MessageType was not inferred")
+	}
+
+	// Verify MB(1) schema was inferred
+	mb1Type := config.GetExpressionNodes()[1].GetMessageBuilderNode().GetMessageType()
+	if mb1Type == "" {
+		t.Error("MB(1) MessageType was not inferred")
+	}
+
+	// Verify agg_2 schema was inferred
+	agg2Type := config.GetSources()[2].GetAggregator().GetMessageBuilder().GetMessageType()
+	if agg2Type == "" {
+		t.Error("agg_2 MessageType was not inferred")
+	}
+}
+
+func TestInfer_MsgBuilderNodeCycleDetected(t *testing.T) {
+	// Node 0: MB referencing Node 1
+	// Node 1: MB referencing Node 0
+	config := pb.MetricsConfig_builder{
+		ExpressionNodes: []*pb.Node{
+			pb.Node_builder{
+				MessageBuilderNode: pb.MessageBuilderNode_builder{
+					FieldAssignments: []*pb.MessageBuilderNode_FieldAssignment{
+						pb.MessageBuilderNode_FieldAssignment_builder{
+							FieldName:           proto.String("b"),
+							ExpressionNodeIndex: proto.Uint32(1),
+						}.Build(),
+					},
+				}.Build(),
+			}.Build(),
+			pb.Node_builder{
+				MessageBuilderNode: pb.MessageBuilderNode_builder{
+					FieldAssignments: []*pb.MessageBuilderNode_FieldAssignment{
+						pb.MessageBuilderNode_FieldAssignment_builder{
+							FieldName:           proto.String("a"),
+							ExpressionNodeIndex: proto.Uint32(0),
+						}.Build(),
+					},
+				}.Build(),
+			}.Build(),
+		},
+	}.Build()
+
+	resolver, err := type_resolvers.NewEnrichedTypeResolverFromFileDescriptorSet(&descriptorpb.FileDescriptorSet{})
+	if err != nil {
+		t.Fatalf("Failed to create type resolver: %v", err)
+	}
+
+	errs := inference.Infer(config, *resolver, make(map[string]string))
+	if len(errs) == 0 {
+		t.Fatal("Infer() succeeded, want error for cycle")
+	}
+	const wantErr = "Cyclic dependency between sources and/or message builders detected"
+	found := false
+	for _, err := range errs {
+		if strings.Contains(err.Error(), wantErr) {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Errorf("Infer() errors = %v, want error containing %q", errs, wantErr)
 	}
 }

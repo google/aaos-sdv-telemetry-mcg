@@ -58,14 +58,27 @@ func (er *ExpressionResolver) Resolve(idx uint32) (*descriptorpb.FieldDescriptor
 	// Combination nodes continue recursion.
 	case pb.Node_CombinationNode_case:
 		return er.resolveCombinationNode(expNode.GetCombinationNode())
-	// Functions and Constants terminate recursion.
+	// Functions, constants, and message builders terminate recursion.
 	case pb.Node_FunctionLeafNode_case:
 		return resolveFunctionLeafNode(expNode.GetFunctionLeafNode())
 	case pb.Node_ConstantLeafNode_case:
 		return resolveConstLeafNode(expNode.GetConstantLeafNode())
+	case pb.Node_MessageBuilderNode_case:
+		return resolveMessageBuilderNode(expNode.GetMessageBuilderNode())
 	default:
 		return nil, fmt.Errorf("Could not resolve Expression Node Type %q", expNode.WhichNodeType().String())
 	}
+}
+
+// resolveMessageBuilderNode evaluates a MessageBuilderNode and returns a FieldDescriptorProto with TYPE_MESSAGE.
+func resolveMessageBuilderNode(node *pb.MessageBuilderNode) (*descriptorpb.FieldDescriptorProto, error) {
+	if node.GetMessageType() == "" {
+		return nil, fmt.Errorf("message_type of message builder node has not been inferred yet")
+	}
+	return &descriptorpb.FieldDescriptorProto{
+		Type:     descriptorpb.FieldDescriptorProto_TYPE_MESSAGE.Enum(),
+		TypeName: proto.String("." + strings.TrimPrefix(node.GetMessageType(), ".")),
+	}, nil
 }
 
 func resolveFunctionLeafNode(expNode *pb.FunctionLeafNode) (*descriptorpb.FieldDescriptorProto, error) {

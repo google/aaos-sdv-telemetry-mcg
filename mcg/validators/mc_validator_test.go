@@ -18,6 +18,7 @@ import (
 	goerrors "errors"
 	"fmt"
 	"os"
+	"slices"
 	"testing"
 	"time"
 
@@ -632,6 +633,253 @@ func TestValidateExpressionNodes_DiamondDAG(t *testing.T) {
 	if len(v.ErrorList) > 0 {
 		validators.PrintErrorList(v)
 		t.Fatalf("ValidateExpressionNodes() got unexpected errors = %v, want none", v.ErrorList)
+	}
+}
+
+func TestValidateExpressionNodes_MessageBuilderNode_Passes(t *testing.T) {
+	nodes := []*pb.Node{
+		pb.Node_builder{ConstantLeafNode: pb.ConstantLeafNode_builder{
+			Int32Value: proto.Int32(10),
+		}.Build()}.Build(),
+		pb.Node_builder{ConstantLeafNode: pb.ConstantLeafNode_builder{
+			Int32Value: proto.Int32(20),
+		}.Build()}.Build(),
+		pb.Node_builder{MessageBuilderNode: pb.MessageBuilderNode_builder{
+			FieldAssignments: []*pb.MessageBuilderNode_FieldAssignment{
+				pb.MessageBuilderNode_FieldAssignment_builder{
+					FieldName:           proto.String("field_a"),
+					ExpressionNodeIndex: proto.Uint32(0),
+				}.Build(),
+				pb.MessageBuilderNode_FieldAssignment_builder{
+					FieldName:           proto.String("field_b"),
+					ExpressionNodeIndex: proto.Uint32(1),
+				}.Build(),
+			},
+		}.Build()}.Build(),
+		// Empty MessageBuilderNode ({}) is also valid
+		pb.Node_builder{MessageBuilderNode: pb.MessageBuilderNode_builder{}.Build()}.Build(),
+	}
+
+	v := validators.NewMcValidator(pb.MetricsConfig_builder{ExpressionNodes: nodes}.Build(), false)
+
+	validators.ValidateExpressionNodes(v)
+	if len(v.ErrorList) != 0 {
+		validators.PrintErrorList(v)
+		t.Fatalf("Validation of valid MessageBuilderNode expression nodes should pass, got: %v", v.ErrorList)
+	}
+}
+
+func TestValidateExpressionNodes_MessageBuilderNode_FieldErrors(t *testing.T) {
+	nodes := []*pb.Node{
+		// Node 0: Constant node for valid reference
+		pb.Node_builder{ConstantLeafNode: pb.ConstantLeafNode_builder{
+			Int32Value: proto.Int32(1),
+		}.Build()}.Build(),
+		// Node 1: Missing field name
+		pb.Node_builder{MessageBuilderNode: pb.MessageBuilderNode_builder{
+			FieldAssignments: []*pb.MessageBuilderNode_FieldAssignment{
+				pb.MessageBuilderNode_FieldAssignment_builder{
+					ExpressionNodeIndex: proto.Uint32(0),
+				}.Build(),
+			},
+		}.Build()}.Build(),
+		// Node 2: Duplicate field name
+		pb.Node_builder{MessageBuilderNode: pb.MessageBuilderNode_builder{
+			FieldAssignments: []*pb.MessageBuilderNode_FieldAssignment{
+				pb.MessageBuilderNode_FieldAssignment_builder{
+					FieldName:           proto.String("dup"),
+					ExpressionNodeIndex: proto.Uint32(0),
+				}.Build(),
+				pb.MessageBuilderNode_FieldAssignment_builder{
+					FieldName:           proto.String("dup"),
+					ExpressionNodeIndex: proto.Uint32(0),
+				}.Build(),
+			},
+		}.Build()}.Build(),
+		// Node 3: Missing expression node index
+		pb.Node_builder{MessageBuilderNode: pb.MessageBuilderNode_builder{
+			FieldAssignments: []*pb.MessageBuilderNode_FieldAssignment{
+				pb.MessageBuilderNode_FieldAssignment_builder{
+					FieldName: proto.String("missing_idx"),
+				}.Build(),
+			},
+		}.Build()}.Build(),
+		// Node 4: Out-of-bounds expression node index
+		pb.Node_builder{MessageBuilderNode: pb.MessageBuilderNode_builder{
+			FieldAssignments: []*pb.MessageBuilderNode_FieldAssignment{
+				pb.MessageBuilderNode_FieldAssignment_builder{
+					FieldName:           proto.String("bad_idx"),
+					ExpressionNodeIndex: proto.Uint32(99),
+				}.Build(),
+			},
+		}.Build()}.Build(),
+	}
+
+	v := validators.NewMcValidator(pb.MetricsConfig_builder{ExpressionNodes: nodes}.Build(), false)
+
+	validators.ValidateExpressionNodes(v)
+
+	if err := assertErrors(
+		v,
+		mcgerrors.MessageBuilderNodeFieldAssignmentMissingFieldName(1),
+		mcgerrors.MessageBuilderNodeDuplicateFieldName(2, "dup"),
+		mcgerrors.MessageBuilderNodeFieldAssignmentMissingExpressionNodeIndex(3, "missing_idx"),
+		mcgerrors.MessageBuilderNodeFieldAssignmentInvalidExpressionNodeIndex(4, "bad_idx", 99),
+	); err != nil {
+		validators.PrintErrorList(v)
+		t.Fatalf("Validation errors mismatch: %v", err)
+	}
+}
+
+func TestValidateExpressionNodes_MessageBuilderNode_MessageTypeErrors(t *testing.T) {
+	node := pb.Node_builder{
+		MessageBuilderNode: pb.MessageBuilderNode_builder{
+			MessageType: proto.String("non.existent.Message"),
+		}.Build(),
+	}.Build()
+
+	v := validators.NewMcValidator(pb.MetricsConfig_builder{ExpressionNodes: []*pb.Node{node}}.Build(), false)
+
+	validators.ValidateExpressionNodes(v)
+
+	if err := assertErrors(
+		v,
+		mcgerrors.UnknownMessageType("non.existent.Message"),
+	); err != nil {
+		validators.PrintErrorList(v)
+		t.Fatalf("Validation error mismatch for unknown message type: %v", err)
+	}
+}
+
+func TestNewGraphForInferenceCycleChecks_MessageBuilderNodeDependencies(t *testing.T) {
+	node0 := pb.Node_builder{
+		FieldLeafNode: pb.FieldLeafNode_builder{
+			SourceName: "source_a",
+			FieldNames: []string{"field_1"},
+		}.Build(),
+	}.Build()
+	node1 := pb.Node_builder{
+		MessageBuilderNode: pb.MessageBuilderNode_builder{
+			FieldAssignments: []*pb.MessageBuilderNode_FieldAssignment{
+				pb.MessageBuilderNode_FieldAssignment_builder{
+					FieldName:           proto.String("inner_a"),
+					ExpressionNodeIndex: proto.Uint32(0),
+				}.Build(),
+			},
+		}.Build(),
+	}.Build()
+
+	aggregatorSource := pb.Source_builder{
+		Name: "agg_source",
+		Aggregator: pb.Aggregator_builder{
+			TriggerNames: []string{"trigger_1"},
+			MessageBuilder: pb.ProtoMessageBuilder_builder{
+				FieldAssignments: []*pb.ProtoMessageBuilder_FieldAssignment{
+					pb.ProtoMessageBuilder_FieldAssignment_builder{
+						FieldName: "out_field",
+						NoAggregation: pb.ProtoMessageBuilder_FieldAssignment_NoAggregation_builder{
+							ExpressionNodeIndex: proto.Uint32(1),
+						}.Build(),
+					}.Build(),
+				},
+			}.Build(),
+		}.Build(),
+	}.Build()
+
+	mc := pb.MetricsConfig_builder{
+		Sources: []*pb.Source{
+			pb.Source_builder{Name: "source_a", DataSource: pb.DataSource_builder{SourceIdentifier: "id_a"}.Build()}.Build(),
+			aggregatorSource,
+		},
+		ExpressionNodes: []*pb.Node{node0, node1},
+	}.Build()
+
+	g := validators.NewGraphForInferenceCycleChecks(mc)
+	if !slices.Contains(slices.Collect(g.GetNeighbors(validators.SourceName("agg_source"))), validators.MessageBuilderNode(1)) {
+		t.Errorf("NewGraphForInferenceCycleChecks() edge from agg_source to MessageBuilderNode(1) missing, want present")
+	}
+	if !slices.Contains(slices.Collect(g.GetNeighbors(validators.MessageBuilderNode(1))), validators.SourceName("source_a")) {
+		t.Errorf("NewGraphForInferenceCycleChecks() edge from MessageBuilderNode(1) to source_a missing, want present")
+	}
+}
+
+func TestNewGraphForInferenceCycleChecks_CycleBetweenSourceAndMessageBuilder(t *testing.T) {
+	node0 := pb.Node_builder{
+		FieldLeafNode: pb.FieldLeafNode_builder{
+			SourceName: "agg_source",
+			FieldNames: []string{"field_1"},
+		}.Build(),
+	}.Build()
+	node1 := pb.Node_builder{
+		MessageBuilderNode: pb.MessageBuilderNode_builder{
+			FieldAssignments: []*pb.MessageBuilderNode_FieldAssignment{
+				pb.MessageBuilderNode_FieldAssignment_builder{
+					FieldName:           proto.String("inner_a"),
+					ExpressionNodeIndex: proto.Uint32(0),
+				}.Build(),
+			},
+		}.Build(),
+	}.Build()
+
+	aggregatorSource := pb.Source_builder{
+		Name: "agg_source",
+		Aggregator: pb.Aggregator_builder{
+			TriggerNames: []string{"trigger_1"},
+			MessageBuilder: pb.ProtoMessageBuilder_builder{
+				FieldAssignments: []*pb.ProtoMessageBuilder_FieldAssignment{
+					pb.ProtoMessageBuilder_FieldAssignment_builder{
+						FieldName: "out_field",
+						NoAggregation: pb.ProtoMessageBuilder_FieldAssignment_NoAggregation_builder{
+							ExpressionNodeIndex: proto.Uint32(1),
+						}.Build(),
+					}.Build(),
+				},
+			}.Build(),
+		}.Build(),
+	}.Build()
+
+	mc := pb.MetricsConfig_builder{
+		Sources:         []*pb.Source{aggregatorSource},
+		ExpressionNodes: []*pb.Node{node0, node1},
+	}.Build()
+
+	g := validators.NewGraphForInferenceCycleChecks(mc)
+	_, err := g.TopologicalOrdering()
+	if err == nil {
+		t.Fatal("NewGraphForInferenceCycleChecks() expected cycle between agg_source and MessageBuilderNode(1), got nil")
+	}
+}
+
+func TestNewGraphForInferenceCycleChecks_CycleBetweenMessageBuilders(t *testing.T) {
+	node0 := pb.Node_builder{
+		MessageBuilderNode: pb.MessageBuilderNode_builder{
+			FieldAssignments: []*pb.MessageBuilderNode_FieldAssignment{
+				pb.MessageBuilderNode_FieldAssignment_builder{
+					FieldName:           proto.String("field_0"),
+					ExpressionNodeIndex: proto.Uint32(1),
+				}.Build(),
+			},
+		}.Build(),
+	}.Build()
+	node1 := pb.Node_builder{
+		MessageBuilderNode: pb.MessageBuilderNode_builder{
+			FieldAssignments: []*pb.MessageBuilderNode_FieldAssignment{
+				pb.MessageBuilderNode_FieldAssignment_builder{
+					FieldName:           proto.String("field_1"),
+					ExpressionNodeIndex: proto.Uint32(0),
+				}.Build(),
+			},
+		}.Build(),
+	}.Build()
+
+	mc := pb.MetricsConfig_builder{
+		ExpressionNodes: []*pb.Node{node0, node1},
+	}.Build()
+
+	g := validators.NewGraphForInferenceCycleChecks(mc)
+	_, err := g.TopologicalOrdering()
+	if err == nil {
+		t.Fatal("NewGraphForInferenceCycleChecks() expected cycle between MessageBuilderNode(0) and MessageBuilderNode(1), got nil")
 	}
 }
 

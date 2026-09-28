@@ -16,6 +16,8 @@ package validators
 
 import (
 	"fmt"
+	"strconv"
+	"strings"
 
 	"sdv.googlesource.com/mcg/mcg/expressions"
 	"sdv.googlesource.com/mcg/mcg/graph"
@@ -55,50 +57,117 @@ func newGraphForSourceAndTriggerDepsCycleChecks(mc *pb.MetricsConfig) *graph.Gra
 	return g
 }
 
-// NewGraphForInferenceCycleChecks constructs a `Graph` from sources. Edges
-// in the graph represent data dependencies from aggregators' message
-// builders to other sources.
-func NewGraphForInferenceCycleChecks(mc *pb.MetricsConfig) *graph.Graph[string] {
-	g := graph.NewGraph[string]()
+// InferenceNode represents a node in the inference dependency graph.
+type InferenceNode string
 
-	for _, pub := range mc.GetSources() {
-		g.AddNode(pub.GetName())
-		for _, fieldAssignment := range pub.GetAggregator().GetMessageBuilder().GetFieldAssignments() {
-			if fieldAssignment == nil {
+// SourceName constructs an InferenceNode for a named source.
+func SourceName(name string) InferenceNode {
+	return InferenceNode("source:" + name)
+}
+
+// MessageBuilderNode constructs an InferenceNode for a message builder expression node by its index.
+func MessageBuilderNode(idx uint32) InferenceNode {
+	return InferenceNode("message_builder_node:" + strconv.FormatUint(uint64(idx), 10))
+}
+
+// SourceName returns the source name if n represents a source.
+func (n InferenceNode) SourceName() (string, bool) {
+	return strings.CutPrefix(string(n), "source:")
+}
+
+// MessageBuilderIndex returns the expression node index if n represents a message builder node.
+func (n InferenceNode) MessageBuilderIndex() (uint32, bool) {
+	idxStr, ok := strings.CutPrefix(string(n), "message_builder_node:")
+	if !ok {
+		return 0, false
+	}
+	idx, err := strconv.ParseUint(idxStr, 10, 32)
+	if err != nil {
+		return 0, false
+	}
+	return uint32(idx), true
+}
+
+// NewGraphForInferenceCycleChecks constructs a `Graph` from sources and message
+// builder nodes. Edges in the graph represent data dependencies between
+// aggregators' message builders, expression node message builders, and other
+// sources or expression node message builders.
+func NewGraphForInferenceCycleChecks(mc *pb.MetricsConfig) *graph.Graph[InferenceNode] {
+	g := graph.NewGraph[InferenceNode]()
+
+	for _, source := range mc.GetSources() {
+		g.AddNode(SourceName(source.GetName()))
+	}
+
+	for idx, node := range mc.GetExpressionNodes() {
+		if node.GetMessageBuilderNode() != nil {
+			g.AddNode(MessageBuilderNode(uint32(idx)))
+		}
+	}
+
+	findDeps := func(rootIndex uint32) []InferenceNode {
+		var deps []InferenceNode
+		visited := make(map[uint32]bool)
+		queue := []uint32{rootIndex}
+
+		for len(queue) > 0 {
+			currIdx := queue[0]
+			queue = queue[1:]
+
+			if visited[currIdx] {
 				continue
 			}
+			visited[currIdx] = true
 
+			if int(currIdx) >= len(mc.GetExpressionNodes()) {
+				continue
+			}
+			node := mc.GetExpressionNodes()[currIdx]
+			switch node.WhichNodeType() {
+			case pb.Node_FieldLeafNode_case:
+				node := node.GetFieldLeafNode()
+				if node.HasExpressionNodeIndex() {
+					queue = append(queue, node.GetExpressionNodeIndex())
+				} else if sourceName := node.GetSourceName(); sourceName != "" {
+					deps = append(deps, SourceName(sourceName))
+				}
+			case pb.Node_CombinationNode_case:
+				node := node.GetCombinationNode()
+				if node.HasLeftIndex() {
+					queue = append(queue, node.GetLeftIndex())
+				}
+				if !expressions.IsUnaryOperator(node) && node.HasRightIndex() {
+					queue = append(queue, node.GetRightIndex())
+				}
+			case pb.Node_MessageBuilderNode_case:
+				deps = append(deps, MessageBuilderNode(currIdx))
+			case pb.Node_FunctionLeafNode_case, pb.Node_ConstantLeafNode_case:
+				// These cannot reference another source or message builder.
+			}
+		}
+		return deps
+	}
+
+	for _, source := range mc.GetSources() {
+		for _, fieldAssignment := range source.GetAggregator().GetMessageBuilder().GetFieldAssignments() {
 			if nodeIndex, ok := expressions.ExtractNodeIndex(fieldAssignment); ok {
-				queue := []uint32{nodeIndex}
-				for len(queue) > 0 {
-					nodeIndex = queue[0]
-					queue = queue[1:]
-
-					if node := mc.GetExpressionNodes()[nodeIndex]; node != nil {
-						switch node.WhichNodeType() {
-						case pb.Node_FieldLeafNode_case:
-							fn := node.GetFieldLeafNode()
-
-							if fn.HasExpressionNodeIndex() {
-								queue = append(queue, fn.GetExpressionNodeIndex())
-							} else {
-								g.AddEdge(pub.GetName(), fn.GetSourceName())
-							}
-						case pb.Node_CombinationNode_case:
-							cn := node.GetCombinationNode()
-
-							queue = append(queue, cn.GetLeftIndex())
-							if !expressions.IsUnaryOperator(cn) {
-								queue = append(queue, cn.GetRightIndex())
-							}
-						case pb.Node_FunctionLeafNode_case, pb.Node_ConstantLeafNode_case:
-							// These cannot reference another source, thus we are done here.
-						}
-					}
+				for _, dep := range findDeps(nodeIndex) {
+					g.AddEdge(SourceName(source.GetName()), dep)
 				}
 			}
 		}
 	}
+
+	for idx, node := range mc.GetExpressionNodes() {
+		for _, fa := range node.GetMessageBuilderNode().GetFieldAssignments() {
+			if fa.HasExpressionNodeIndex() {
+				for _, dep := range findDeps(fa.GetExpressionNodeIndex()) {
+					g.AddEdge(MessageBuilderNode(uint32(idx)), dep)
+				}
+			}
+		}
+	}
+
 	return g
 }
 
@@ -132,6 +201,14 @@ func NewGraphForExpressionNodeCyclesChecks(mc *pb.MetricsConfig) *graph.Graph[Ex
 			node := node.GetFieldLeafNode()
 			if node.HasExpressionNodeIndex() {
 				g.AddEdge(nodeIdx, ExpressionNode(node.GetExpressionNodeIndex()))
+			}
+		case pb.Node_MessageBuilderNode_case:
+			node := node.GetMessageBuilderNode()
+			for _, fa := range node.GetFieldAssignments() {
+				if !fa.HasExpressionNodeIndex() {
+					continue
+				}
+				g.AddEdge(nodeIdx, ExpressionNode(fa.GetExpressionNodeIndex()))
 			}
 		default:
 		}

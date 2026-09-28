@@ -131,6 +131,18 @@ var (
 		return InvalidArgument("Field assignment aggregation missing").WithFieldViolation(
 			fmt.Sprintf("%s.field_assignments[%d].aggregation", path, idx), FIELD_MISSING)
 	}
+	MessageBuilderNodeFieldAssignmentMissingFieldName = func(idx int) *StatusError {
+		return InvalidArgument(fmt.Sprintf("expression_nodes[%d]: field assignment missing field name", idx))
+	}
+	MessageBuilderNodeDuplicateFieldName = func(idx int, fieldName string) *StatusError {
+		return InvalidArgument(fmt.Sprintf("expression_nodes[%d]: duplicate field name %q", idx, fieldName))
+	}
+	MessageBuilderNodeFieldAssignmentMissingExpressionNodeIndex = func(idx int, fieldName string) *StatusError {
+		return InvalidArgument(fmt.Sprintf("expression_nodes[%d]: field assignment %q missing expression node index", idx, fieldName))
+	}
+	MessageBuilderNodeFieldAssignmentInvalidExpressionNodeIndex = func(idx int, fieldName string, exprIdx uint32) *StatusError {
+		return InvalidArgument(fmt.Sprintf("expression_nodes[%d]: field assignment %q refers to invalid expression node index %d", idx, fieldName, exprIdx))
+	}
 	CombinationExpressionNodeWithInvalidExpressionNodeReference = func(expressionNodeIdx uint32) *StatusError {
 		return InvalidArgument("A combination node refers to a non-existent expression node").WithFieldViolation(fmt.Sprintf("expression_nodes[%d]", expressionNodeIdx), FIELD_INVALID)
 	}
