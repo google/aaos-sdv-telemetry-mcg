@@ -3678,6 +3678,23 @@ func TestShuntParseMessageBuilder(t *testing.T) {
 					}.Build()}.Build(),
 				},
 			},
+			{
+				name:       "nested_function_call_with_commas",
+				expression: "{ field_1: contains(source.list, 1), field_2: 42 }",
+				expectRoot: 4,
+				expectNodes: []*pb.Node{
+					pb.Node_builder{FieldLeafNode: pb.FieldLeafNode_builder{SourceName: "source", FieldNames: []string{"list"}}.Build()}.Build(),
+					pb.Node_builder{ConstantLeafNode: pb.ConstantLeafNode_builder{Int32Value: proto.Int32(1)}.Build()}.Build(),
+					pb.Node_builder{CombinationNode: pb.CombinationNode_builder{LeftIndex: proto.Uint32(0), RightIndex: proto.Uint32(1), RelationalOperator: pb.CombinationNode_CONTAINS.Enum()}.Build()}.Build(),
+					pb.Node_builder{ConstantLeafNode: pb.ConstantLeafNode_builder{Int32Value: proto.Int32(42)}.Build()}.Build(),
+					pb.Node_builder{MessageBuilderNode: pb.MessageBuilderNode_builder{
+						FieldAssignments: []*pb.MessageBuilderNode_FieldAssignment{
+							pb.MessageBuilderNode_FieldAssignment_builder{FieldName: proto.String("field_1"), ExpressionNodeIndex: proto.Uint32(2)}.Build(),
+							pb.MessageBuilderNode_FieldAssignment_builder{FieldName: proto.String("field_2"), ExpressionNodeIndex: proto.Uint32(3)}.Build(),
+						},
+					}.Build()}.Build(),
+				},
+			},
 		}
 
 		for _, tc := range cases {
