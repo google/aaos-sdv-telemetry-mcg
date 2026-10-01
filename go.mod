@@ -1,6 +1,6 @@
 module sdv.googlesource.com/mcg
 
-go 1.25.4
+go 1.26.8
 
 require (
 	github.com/bazelbuild/buildtools v0.0.0-20250930140053-2eb4fccefb52
