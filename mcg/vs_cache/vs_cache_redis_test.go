@@ -67,7 +67,7 @@ func TestRedisCacheCluster(t *testing.T) {
 		}
 	}()
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	waitForContainerHealthy(ctx, t, pool, resource)
 
@@ -108,7 +108,7 @@ func TestRedisCacheStandalone(t *testing.T) {
 		}
 	}()
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	waitForContainerHealthy(ctx, t, pool, resource)
 	config := vs_cache.CacheConfig{

@@ -16,7 +16,6 @@ package mcg_test
 
 import (
 	"bytes"
-	"context"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -132,7 +131,7 @@ func fixtureTestCurrent(t *testing.T, jsonReq, textproto string, opts ...cmp.Opt
 //
 // Make one call to this function per test or per subtest.
 func fixtureTest(t *testing.T, apiVersion constants.APIVersion, jsonReq, textproto string, opts ...cmp.Option) {
-	ctx := context.Background()
+	ctx := t.Context()
 	router, _ := setupServer(ctx, t, false)
 
 	w := performPostRequest(router,
@@ -634,7 +633,7 @@ func TestMilestoneEIPF_B(t *testing.T) {
 }
 
 func TestTextFormat(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	router, _ := setupServer(ctx, t, false)
 
 	w := performPostRequest(router,
@@ -692,7 +691,7 @@ func TestValidateWithTextprotoPasses(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.description, func(t *testing.T) {
-			ctx := context.Background()
+			ctx := t.Context()
 			router, _ := setupServer(ctx, t, false)
 
 			w := performPostRequest(router,
@@ -707,7 +706,7 @@ func TestValidateWithTextprotoPasses(t *testing.T) {
 }
 
 func TestValidateWithTextprotoFails(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	router, _ := setupServer(ctx, t, false)
 
 	textProtoAsBytes := []byte(FileAsBytes(t, EIPF_B_TEXTPROTO_FILENAME))
@@ -738,7 +737,7 @@ func TestValidateWithTextprotoFails(t *testing.T) {
 func TestValidateWithInvalidUuidFails(t *testing.T) {
 	for _, tc := range getInvalidUuidTestCases() {
 		t.Run(tc.name, func(t *testing.T) {
-			ctx := context.Background()
+			ctx := t.Context()
 			router, _ := setupServer(ctx, t, false)
 
 			textProtoAsBytes := []byte(fmt.Sprintf(`uuid: %q`, tc.uuid))
@@ -758,7 +757,7 @@ func TestValidateWithInvalidUuidFails(t *testing.T) {
 }
 
 func TestGenerateAndValidateWithProtobufBytesPasses(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	router, _ := setupServer(ctx, t, false)
 
 	w1 := performPostRequest(router,
@@ -788,7 +787,7 @@ func TestGenerateAndValidateWithProtobufBytesPasses(t *testing.T) {
 }
 
 func TestFieldType(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	router, _ := setupServer(ctx, t, false)
 
 	var mcr requests.MetricsConfigRequest
@@ -823,7 +822,7 @@ func TestFieldType(t *testing.T) {
 }
 
 func TestIgnoreValidations(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	router, _ := setupServer(ctx, t, false)
 
 	invalidPayload := `{
@@ -863,7 +862,7 @@ func TestIgnoreValidations(t *testing.T) {
 func TestGenerateWithExistingInvalidUuidFails(t *testing.T) {
 	for _, tc := range getInvalidUuidTestCases() {
 		t.Run(tc.name, func(t *testing.T) {
-			ctx := context.Background()
+			ctx := t.Context()
 			router, _ := setupServer(ctx, t, false)
 
 			payload := fmt.Sprintf(`{"existing_uuid": %q}`, tc.uuid)
@@ -990,7 +989,7 @@ func TestAPIVersionCompatibility(t *testing.T) {
 }
 
 func TestSourceReferencingNonExistingSource(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	router, _ := setupServer(ctx, t, false)
 
 	payload := `{
@@ -1032,7 +1031,7 @@ func TestSourceReferencingNonExistingSource(t *testing.T) {
 }
 
 func TestGetFileDescriptor(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	router, _ := setupServer(ctx, t, false)
 
 	fds_want_bytes, err := os.ReadFile(EIPF_B_TEXTPROTO_FDS_FILENAME)
@@ -1067,7 +1066,7 @@ func TestGetFileDescriptor(t *testing.T) {
 }
 
 func TestInferenceFailsForVectorOfVector(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	router, _ := setupServer(ctx, t, false)
 
 	payload := `{
@@ -1139,7 +1138,7 @@ func loadEipfBAsLegacyTextproto(t *testing.T) []byte {
 }
 
 func TestV1EndpointsAcceptLegacyFormat(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	router, _ := setupServer(ctx, t, false)
 
 	t.Run("validate_v1_textproto", func(t *testing.T) {
@@ -1188,7 +1187,7 @@ func TestV1EndpointsAcceptLegacyFormat(t *testing.T) {
 }
 
 func TestAPIVersionSchemaEnforcement(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	router, _ := setupServer(ctx, t, false)
 
 	deprecatedPayload := string(FileAsBytes(t, API_COMPATIBILITY_LEGACY_JSON_FILENAME))
@@ -1270,7 +1269,7 @@ func TestNoMessageInference(t *testing.T) {
 		}
 	`
 
-	ctx := context.Background()
+	ctx := t.Context()
 	router, _ := setupServer(ctx, t, false)
 	body := strings.NewReader(jsonInput)
 	req, _ := http.NewRequest(http.MethodPost, "/api/v2/generate_metrics_config?no_inference=true", body)
@@ -1303,7 +1302,7 @@ func TestNoMessageInference(t *testing.T) {
 }
 
 func TestDisallowComparisonOperatorChainingAPI(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	router, _ := setupServer(ctx, t, false)
 
 	// A minimal payload with a chained expression.
@@ -1374,7 +1373,7 @@ func TestDisallowComparisonOperatorChainingAPI(t *testing.T) {
 }
 
 func TestRightAssociativeExponentiationAPI(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	router, _ := setupServer(ctx, t, false)
 
 	powerPayload := `{
@@ -1439,7 +1438,7 @@ func TestRightAssociativeExponentiationAPI(t *testing.T) {
 }
 
 func TestGetFileDescriptorInvalidPayload(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	router, _ := setupServer(ctx, t, false)
 
 	testCases := []struct {
@@ -1481,7 +1480,7 @@ func TestGetFileDescriptorInvalidPayload(t *testing.T) {
 }
 
 func TestMessageBuilderNodeSupported_GenerateAPI(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	router, _ := setupServer(ctx, t, false)
 
 	payloadWithoutMessageBuilderNode := `{
@@ -1570,7 +1569,7 @@ func TestMessageBuilderNodeSupported_GenerateAPI(t *testing.T) {
 }
 
 func TestMessageBuilderNodeSupported_ValidateAPI(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	router, _ := setupServer(ctx, t, false)
 
 	mcSingle := pb.MetricsConfig_builder{

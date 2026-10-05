@@ -15,7 +15,6 @@
 package requests_test
 
 import (
-	"context"
 	"encoding/json"
 	"strings"
 	"testing"
@@ -80,7 +79,7 @@ func TestParseDataSourceConfigurationFromDescriptorProtos(t *testing.T) {
 				DescriptorProtos: [][]byte{fdBytes},
 			}
 
-			sess, errs := req.ToSession(context.Background())
+			sess, errs := req.ToSession(t.Context())
 			if len(errs) > 0 {
 				t.Fatalf("req.ToSession() failed with errors: %v", errs)
 			}
@@ -116,7 +115,7 @@ func TestMetricsConfigWithDataSources(t *testing.T) {
 		},
 	}
 
-	sess, errs := req.ToSession(context.Background())
+	sess, errs := req.ToSession(t.Context())
 	if len(errs) > 0 {
 		t.Fatalf("req.ToSession() failed with errors: %v", errs)
 	}
@@ -139,7 +138,7 @@ func TestMetricsConfigWithAggregators(t *testing.T) {
 		},
 	}
 
-	sess, errs := req.ToSession(context.Background())
+	sess, errs := req.ToSession(t.Context())
 	if len(errs) > 0 {
 		t.Fatalf("req.ToSession() failed with errors: %v", errs)
 	}
@@ -155,7 +154,7 @@ func TestMetricsConfigTriggerAliases(t *testing.T) {
 		DeactivateTrigger: "deactivate_trigger",
 	}
 
-	sess, errs := req.ToSession(context.Background())
+	sess, errs := req.ToSession(t.Context())
 	if len(errs) > 0 {
 		t.Fatalf("req.ToSession() failed with errors: %v", errs)
 	}
@@ -176,7 +175,7 @@ func TestMetricsConfigDuplicateNames(t *testing.T) {
 		},
 	}
 
-	_, errs := req.ToSession(context.Background())
+	_, errs := req.ToSession(t.Context())
 	if len(errs) == 0 {
 		t.Fatal("Expected error but got none")
 	}
@@ -207,7 +206,7 @@ func TestMetricsConfigRetainAggregators(t *testing.T) {
 				RetainAggregationsOnStop: tc.value,
 			}
 
-			sess, errs := req.ToSession(context.Background())
+			sess, errs := req.ToSession(t.Context())
 			if len(errs) > 0 {
 				t.Fatalf("req.ToSession() failed with errors: %v", errs)
 			}
@@ -221,7 +220,7 @@ func TestMetricsConfigRetainAggregators(t *testing.T) {
 
 func TestToSession_MessageBuilderNodeSupportedDefaultsToTrue(t *testing.T) {
 	req := &requests.MetricsConfigRequest{}
-	sess, errs := req.ToSession(context.Background())
+	sess, errs := req.ToSession(t.Context())
 	if len(errs) > 0 {
 		t.Fatalf("req.ToSession() error = %v, want none", errs)
 	}

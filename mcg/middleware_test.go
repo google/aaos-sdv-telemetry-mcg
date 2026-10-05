@@ -15,7 +15,6 @@
 package mcg_test
 
 import (
-	"context"
 	"net/http"
 	"testing"
 
@@ -23,7 +22,7 @@ import (
 )
 
 func TestMiddleware304(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	router, _ := setupServer(ctx, t, false)
 
 	// Simulate a route that sends `ETag` and `Last-Modified` headers, and

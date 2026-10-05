@@ -15,7 +15,6 @@
 package mcg_test
 
 import (
-	"context"
 	"mime"
 	"net/http"
 	"net/http/httptest"
@@ -116,7 +115,7 @@ expression_nodes {
 }
 
 func TestChooseRenderFunc(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	router, _ := setupServer(ctx, t, false)
 
 	w := httptest.NewRecorder()

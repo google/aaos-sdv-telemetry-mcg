@@ -16,7 +16,6 @@ package signal_versions_test
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -36,7 +35,7 @@ import (
 const VALID_VS_VERSION = "../testdata/vsignal_api/sample_ssot_ver1.json"
 
 func TestLocalCache(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	config := vs_cache.CacheConfig{
 		EnableLocalCache: true,
 		EnableRedCache:   false,
@@ -90,7 +89,7 @@ func TestLocalCache(t *testing.T) {
 }
 
 func TestNoCacheAdd(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	config := vs_cache.CacheConfig{
 		EnableLocalCache: false,
 		EnableRedCache:   false,
@@ -110,7 +109,7 @@ func TestNoCacheAdd(t *testing.T) {
 }
 
 func TestNoCacheDelete(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	config := vs_cache.CacheConfig{
 		EnableLocalCache: false,
 		EnableRedCache:   false,
@@ -130,7 +129,7 @@ func TestNoCacheDelete(t *testing.T) {
 }
 
 func TestNoCacheList(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	config := vs_cache.CacheConfig{
 		EnableLocalCache: false,
 		EnableRedCache:   false,

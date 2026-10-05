@@ -15,7 +15,6 @@
 package vs_cache_test
 
 import (
-	"context"
 	"sync"
 	"testing"
 
@@ -39,7 +38,7 @@ type VehicleSignalRequest struct {
 }
 
 func TestLocalCache(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	config := vs_cache.CacheConfig{
 		EnableLocalCache: true,
 	}
@@ -74,7 +73,7 @@ func TestLocalCache(t *testing.T) {
 }
 
 func TestLocalCacheDelete(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	config := vs_cache.CacheConfig{
 		EnableLocalCache: true,
 	}
@@ -111,7 +110,7 @@ func TestLocalCacheDelete(t *testing.T) {
 }
 
 func TestLocalCacheLimitSet(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	config := vs_cache.CacheConfig{
 		EnableLocalCache: true,
 		LocalCapacity:    3,
@@ -167,7 +166,7 @@ func TestLocalCacheLimitSet(t *testing.T) {
 }
 
 func TestDataRaceGetSet(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	config := vs_cache.CacheConfig{
 		EnableLocalCache: true,
 		LocalCapacity:    100,
@@ -209,7 +208,7 @@ func TestDataRaceGetSet(t *testing.T) {
 }
 
 func TestGetDoesNotModifyCache(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	config := vs_cache.CacheConfig{
 		EnableLocalCache: true,
 	}

@@ -15,7 +15,6 @@
 package mcg_test
 
 import (
-	"context"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -33,7 +32,7 @@ const (
 )
 
 func TestGenerateWithVersionNoCache(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	router, _ := setupServer(ctx, t, false)
 
 	w := sendGenerateRequest(t, router, jsonInferVsFile)
@@ -48,7 +47,7 @@ func TestGenerateWithVersionNoCache(t *testing.T) {
 }
 
 func TestGenerateWithMissingVsVersion(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	router, _ := setupServer(ctx, t, true)
 
 	w := sendGenerateRequest(t, router, jsonInferVsFile)
@@ -63,7 +62,7 @@ func TestGenerateWithMissingVsVersion(t *testing.T) {
 }
 
 func TestGenerateWithVsVersion(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	router, _ := setupServer(ctx, t, true)
 
 	w := sendVsAddRequest(t, router, validVsVersionFile)

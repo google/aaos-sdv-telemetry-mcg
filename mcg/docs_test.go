@@ -15,7 +15,6 @@
 package mcg_test
 
 import (
-	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -26,7 +25,7 @@ import (
 )
 
 func TestSwaggerUIIsServed(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	router, _ := setupServer(ctx, t, false)
 
 	w := httptest.NewRecorder()
@@ -46,7 +45,7 @@ func TestSwaggerUIIsServed(t *testing.T) {
 }
 
 func TestDocsRedirect(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	router, _ := setupServer(ctx, t, false)
 
 	w := httptest.NewRecorder()
@@ -62,7 +61,7 @@ func TestDocsRedirect(t *testing.T) {
 }
 
 func TestOpenApiSpec(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	router, _ := setupServer(ctx, t, false)
 
 	t.Run("yaml", func(t *testing.T) {
