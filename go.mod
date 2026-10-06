@@ -32,7 +32,7 @@ require (
 	github.com/gin-contrib/sse v1.1.2 // indirect
 	github.com/go-playground/locales v0.14.2 // indirect
 	github.com/go-playground/universal-translator v0.18.1 // indirect
-	github.com/go-playground/validator/v10 v10.30.4 // indirect
+	github.com/go-playground/validator/v10 v10.30.5 // indirect
 	github.com/goccy/go-json v0.11.2 // indirect
 	github.com/golang/protobuf v1.5.4 // indirect
 	github.com/gotestyourself/gotestyourself v2.2.0+incompatible // indirect
@@ -57,10 +57,10 @@ require (
 	github.com/ugorji/go/codec v1.3.2 // indirect
 	go.uber.org/atomic v1.12.0 // indirect
 	golang.org/x/arch v0.31.0 // indirect
-	golang.org/x/crypto v0.55.0 // indirect
-	golang.org/x/net v0.57.0 // indirect
-	golang.org/x/sys v0.47.0 // indirect
-	golang.org/x/text v0.41.0 // indirect
+	golang.org/x/crypto v0.57.0 // indirect
+	golang.org/x/net v0.58.0 // indirect
+	golang.org/x/sys v0.48.0 // indirect
+	golang.org/x/text v0.42.0 // indirect
 	gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c // indirect
 	gotest.tools v2.2.0+incompatible // indirect
 )
