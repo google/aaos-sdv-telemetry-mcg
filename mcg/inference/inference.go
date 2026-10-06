@@ -511,7 +511,7 @@ func (ti *typeInference) validateTriggerTypes() []error {
 					if ac.GetRisingOptions() == nil && ac.GetFallingOptions() == nil {
 						if selectorType.GetType() == initType.GetType() {
 							switch selectorType.GetType() {
-							case descriptorpb.FieldDescriptorProto_TYPE_MESSAGE, descriptorpb.FieldDescriptorProto_TYPE_ENUM:
+							case descriptorpb.FieldDescriptorProto_TYPE_MESSAGE:
 								compatible = selectorType.GetTypeName() == initType.GetTypeName()
 							default:
 								compatible = true

@@ -40,6 +40,19 @@ func TestIsInt(t *testing.T) {
 		{wantMain: descriptorpb.FieldDescriptorProto_TYPE_FLOAT.Enum(), wantBool: false},
 		{wantMain: descriptorpb.FieldDescriptorProto_TYPE_INT64.Enum(), wantBool: true},
 		{wantMain: descriptorpb.FieldDescriptorProto_TYPE_INT32.Enum(), wantBool: true},
+		{wantMain: descriptorpb.FieldDescriptorProto_TYPE_UINT64.Enum(), wantBool: true},
+		{wantMain: descriptorpb.FieldDescriptorProto_TYPE_UINT32.Enum(), wantBool: true},
+		{wantMain: descriptorpb.FieldDescriptorProto_TYPE_SINT64.Enum(), wantBool: true},
+		{wantMain: descriptorpb.FieldDescriptorProto_TYPE_SINT32.Enum(), wantBool: true},
+		{wantMain: descriptorpb.FieldDescriptorProto_TYPE_FIXED64.Enum(), wantBool: true},
+		{wantMain: descriptorpb.FieldDescriptorProto_TYPE_FIXED32.Enum(), wantBool: true},
+		{wantMain: descriptorpb.FieldDescriptorProto_TYPE_SFIXED64.Enum(), wantBool: true},
+		{wantMain: descriptorpb.FieldDescriptorProto_TYPE_SFIXED32.Enum(), wantBool: true},
+		{wantMain: descriptorpb.FieldDescriptorProto_TYPE_ENUM.Enum(), wantBool: true},
+		{wantMain: descriptorpb.FieldDescriptorProto_TYPE_BOOL.Enum(), wantBool: false},
+		{wantMain: descriptorpb.FieldDescriptorProto_TYPE_STRING.Enum(), wantBool: false},
+		{wantMain: descriptorpb.FieldDescriptorProto_TYPE_BYTES.Enum(), wantBool: false},
+		{wantMain: descriptorpb.FieldDescriptorProto_TYPE_MESSAGE.Enum(), wantBool: false},
 	} {
 		if got := inference.IsInt(testCase.wantMain); got != testCase.wantBool {
 			t.Errorf("inference.IsInt(%v) = %v, want %v", testCase.wantMain, got, testCase.wantBool)
@@ -56,8 +69,19 @@ func TestIsNumeric(t *testing.T) {
 		{wantMain: descriptorpb.FieldDescriptorProto_TYPE_FLOAT.Enum(), wantBool: true},
 		{wantMain: descriptorpb.FieldDescriptorProto_TYPE_INT64.Enum(), wantBool: true},
 		{wantMain: descriptorpb.FieldDescriptorProto_TYPE_INT32.Enum(), wantBool: true},
+		{wantMain: descriptorpb.FieldDescriptorProto_TYPE_UINT64.Enum(), wantBool: true},
+		{wantMain: descriptorpb.FieldDescriptorProto_TYPE_UINT32.Enum(), wantBool: true},
+		{wantMain: descriptorpb.FieldDescriptorProto_TYPE_SINT64.Enum(), wantBool: true},
+		{wantMain: descriptorpb.FieldDescriptorProto_TYPE_SINT32.Enum(), wantBool: true},
+		{wantMain: descriptorpb.FieldDescriptorProto_TYPE_FIXED64.Enum(), wantBool: true},
+		{wantMain: descriptorpb.FieldDescriptorProto_TYPE_FIXED32.Enum(), wantBool: true},
+		{wantMain: descriptorpb.FieldDescriptorProto_TYPE_SFIXED64.Enum(), wantBool: true},
+		{wantMain: descriptorpb.FieldDescriptorProto_TYPE_SFIXED32.Enum(), wantBool: true},
+		{wantMain: descriptorpb.FieldDescriptorProto_TYPE_ENUM.Enum(), wantBool: true},
+		{wantMain: descriptorpb.FieldDescriptorProto_TYPE_BOOL.Enum(), wantBool: false},
 		{wantMain: descriptorpb.FieldDescriptorProto_TYPE_STRING.Enum(), wantBool: false},
 		{wantMain: descriptorpb.FieldDescriptorProto_TYPE_BYTES.Enum(), wantBool: false},
+		{wantMain: descriptorpb.FieldDescriptorProto_TYPE_MESSAGE.Enum(), wantBool: false},
 	} {
 		if got := inference.IsNumeric(testCase.wantMain); got != testCase.wantBool {
 			t.Errorf("inference.IsNumeric(%v) = %v, want %v", testCase.wantMain, got, testCase.wantBool)

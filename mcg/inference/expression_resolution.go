@@ -120,7 +120,12 @@ func isInt(nodeType *descriptorpb.FieldDescriptorProto_Type) bool {
 		nodeType.Number() == descriptorpb.FieldDescriptorProto_TYPE_UINT32.Number() ||
 		nodeType.Number() == descriptorpb.FieldDescriptorProto_TYPE_UINT64.Number() ||
 		nodeType.Number() == descriptorpb.FieldDescriptorProto_TYPE_SINT32.Number() ||
-		nodeType.Number() == descriptorpb.FieldDescriptorProto_TYPE_SINT64.Number() {
+		nodeType.Number() == descriptorpb.FieldDescriptorProto_TYPE_SINT64.Number() ||
+		nodeType.Number() == descriptorpb.FieldDescriptorProto_TYPE_FIXED32.Number() ||
+		nodeType.Number() == descriptorpb.FieldDescriptorProto_TYPE_FIXED64.Number() ||
+		nodeType.Number() == descriptorpb.FieldDescriptorProto_TYPE_SFIXED32.Number() ||
+		nodeType.Number() == descriptorpb.FieldDescriptorProto_TYPE_SFIXED64.Number() ||
+		nodeType.Number() == descriptorpb.FieldDescriptorProto_TYPE_ENUM.Number() {
 		return true
 	}
 	return false
@@ -129,10 +134,6 @@ func isInt(nodeType *descriptorpb.FieldDescriptorProto_Type) bool {
 func isNumeric(nodeType *descriptorpb.FieldDescriptorProto_Type) bool {
 	if nodeType.Number() == descriptorpb.FieldDescriptorProto_TYPE_DOUBLE.Number() ||
 		nodeType.Number() == descriptorpb.FieldDescriptorProto_TYPE_FLOAT.Number() ||
-		nodeType.Number() == descriptorpb.FieldDescriptorProto_TYPE_FIXED32.Number() ||
-		nodeType.Number() == descriptorpb.FieldDescriptorProto_TYPE_FIXED64.Number() ||
-		nodeType.Number() == descriptorpb.FieldDescriptorProto_TYPE_SFIXED64.Number() ||
-		nodeType.Number() == descriptorpb.FieldDescriptorProto_TYPE_SFIXED32.Number() ||
 		isInt(nodeType) {
 		return true
 	}

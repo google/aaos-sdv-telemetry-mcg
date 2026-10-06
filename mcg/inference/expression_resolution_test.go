@@ -80,25 +80,54 @@ func TestResolveFunctionLeafNode(t *testing.T) {
 }
 
 func TestIsIntAndIsNumeric(t *testing.T) {
-	tInt32 := descriptorpb.FieldDescriptorProto_TYPE_INT32.Enum()
-	tDouble := descriptorpb.FieldDescriptorProto_TYPE_DOUBLE.Enum()
-	tString := descriptorpb.FieldDescriptorProto_TYPE_STRING.Enum()
+	intTypes := []descriptorpb.FieldDescriptorProto_Type{
+		descriptorpb.FieldDescriptorProto_TYPE_INT32,
+		descriptorpb.FieldDescriptorProto_TYPE_INT64,
+		descriptorpb.FieldDescriptorProto_TYPE_UINT32,
+		descriptorpb.FieldDescriptorProto_TYPE_UINT64,
+		descriptorpb.FieldDescriptorProto_TYPE_SINT32,
+		descriptorpb.FieldDescriptorProto_TYPE_SINT64,
+		descriptorpb.FieldDescriptorProto_TYPE_FIXED32,
+		descriptorpb.FieldDescriptorProto_TYPE_FIXED64,
+		descriptorpb.FieldDescriptorProto_TYPE_SFIXED32,
+		descriptorpb.FieldDescriptorProto_TYPE_SFIXED64,
+		descriptorpb.FieldDescriptorProto_TYPE_ENUM,
+	}
+	for _, ft := range intTypes {
+		if !isInt(ft.Enum()) {
+			t.Errorf("expected %v to be int", ft)
+		}
+		if !isNumeric(ft.Enum()) {
+			t.Errorf("expected %v to be numeric", ft)
+		}
+	}
 
-	if !isInt(tInt32) {
-		t.Errorf("expected TYPE_INT32 to be int")
+	floatTypes := []descriptorpb.FieldDescriptorProto_Type{
+		descriptorpb.FieldDescriptorProto_TYPE_DOUBLE,
+		descriptorpb.FieldDescriptorProto_TYPE_FLOAT,
 	}
-	if isInt(tDouble) {
-		t.Errorf("expected TYPE_DOUBLE not to be int")
+	for _, ft := range floatTypes {
+		if isInt(ft.Enum()) {
+			t.Errorf("expected %v not to be int", ft)
+		}
+		if !isNumeric(ft.Enum()) {
+			t.Errorf("expected %v to be numeric", ft)
+		}
 	}
 
-	if !isNumeric(tInt32) {
-		t.Errorf("expected TYPE_INT32 to be numeric")
+	nonNumericTypes := []descriptorpb.FieldDescriptorProto_Type{
+		descriptorpb.FieldDescriptorProto_TYPE_STRING,
+		descriptorpb.FieldDescriptorProto_TYPE_BOOL,
+		descriptorpb.FieldDescriptorProto_TYPE_MESSAGE,
+		descriptorpb.FieldDescriptorProto_TYPE_BYTES,
 	}
-	if !isNumeric(tDouble) {
-		t.Errorf("expected TYPE_DOUBLE to be numeric")
-	}
-	if isNumeric(tString) {
-		t.Errorf("expected TYPE_STRING not to be numeric")
+	for _, ft := range nonNumericTypes {
+		if isInt(ft.Enum()) {
+			t.Errorf("expected %v not to be int", ft)
+		}
+		if isNumeric(ft.Enum()) {
+			t.Errorf("expected %v not to be numeric", ft)
+		}
 	}
 }
 
@@ -313,14 +342,52 @@ func TestResolveCombinationNode(t *testing.T) {
 }
 
 func TestResolveArithExpressions(t *testing.T) {
+	mockGetDescriptorProto := func(name protoreflect.FullName) *descriptorpb.DescriptorProto {
+		if name == "pkg.Message" {
+			return &descriptorpb.DescriptorProto{
+				Name: proto.String("Message"),
+				Field: []*descriptorpb.FieldDescriptorProto{
+					{Name: proto.String("fixed32_val"), Type: descriptorpb.FieldDescriptorProto_TYPE_FIXED32.Enum()},
+					{Name: proto.String("fixed64_val"), Type: descriptorpb.FieldDescriptorProto_TYPE_FIXED64.Enum()},
+					{Name: proto.String("sfixed32_val"), Type: descriptorpb.FieldDescriptorProto_TYPE_SFIXED32.Enum()},
+					{Name: proto.String("sfixed64_val"), Type: descriptorpb.FieldDescriptorProto_TYPE_SFIXED64.Enum()},
+					{Name: proto.String("enum_val"), Type: descriptorpb.FieldDescriptorProto_TYPE_ENUM.Enum(), TypeName: proto.String(".pkg.Enum")},
+				},
+			}
+		}
+		return nil
+	}
+	mockGetSourceMessageName := func(sourceName string) (protoreflect.FullName, error) {
+		if sourceName == "src" {
+			return protoreflect.FullName("pkg.Message"), nil
+		}
+		return "", fmt.Errorf("unknown source: %s", sourceName)
+	}
+
 	config := pb.MetricsConfig_builder{
 		ExpressionNodes: []*pb.Node{
+			// 0: int32
 			pb.Node_builder{ConstantLeafNode: pb.ConstantLeafNode_builder{Int32Value: proto.Int32(1)}.Build()}.Build(),
+			// 1: double
 			pb.Node_builder{ConstantLeafNode: pb.ConstantLeafNode_builder{DoubleValue: proto.Float64(2.0)}.Build()}.Build(),
+			// 2: fixed32
+			pb.Node_builder{FieldLeafNode: pb.FieldLeafNode_builder{SourceName: "src", FieldNames: []string{"fixed32_val"}}.Build()}.Build(),
+			// 3: fixed64
+			pb.Node_builder{FieldLeafNode: pb.FieldLeafNode_builder{SourceName: "src", FieldNames: []string{"fixed64_val"}}.Build()}.Build(),
+			// 4: sfixed32
+			pb.Node_builder{FieldLeafNode: pb.FieldLeafNode_builder{SourceName: "src", FieldNames: []string{"sfixed32_val"}}.Build()}.Build(),
+			// 5: sfixed64
+			pb.Node_builder{FieldLeafNode: pb.FieldLeafNode_builder{SourceName: "src", FieldNames: []string{"sfixed64_val"}}.Build()}.Build(),
+			// 6: enum
+			pb.Node_builder{FieldLeafNode: pb.FieldLeafNode_builder{SourceName: "src", FieldNames: []string{"enum_val"}}.Build()}.Build(),
 		},
 	}.Build()
 
-	er := NewExpressionResolver(config.GetExpressionNodes(), nil, nil)
+	er := NewExpressionResolver(config.GetExpressionNodes(), mockGetSourceMessageName, mockGetDescriptorProto)
+
+	wantInt64 := &descriptorpb.FieldDescriptorProto{
+		Type: descriptorpb.FieldDescriptorProto_TYPE_INT64.Enum(),
+	}
 
 	tests := []struct {
 		name       string
@@ -335,17 +402,44 @@ func TestResolveArithExpressions(t *testing.T) {
 		{"Int32 / Int32 -> Double", pb.CombinationNode_DIVIDE, 0, 0, &descriptorpb.FieldDescriptorProto{
 			Type: descriptorpb.FieldDescriptorProto_TYPE_DOUBLE.Enum(),
 		}},
-		{"Int32 % Int32 -> Int64", pb.CombinationNode_MODULO_TRUNC, 0, 0, &descriptorpb.FieldDescriptorProto{
-			Type: descriptorpb.FieldDescriptorProto_TYPE_INT64.Enum(),
-		}},
-		{"UnaryMinus Int32 -> Int64", pb.CombinationNode_UNARY_MINUS, 0, 0, &descriptorpb.FieldDescriptorProto{Type: descriptorpb.FieldDescriptorProto_TYPE_INT64.Enum()}},
-
+		{"Int32 % Int32 -> Int64", pb.CombinationNode_MODULO_TRUNC, 0, 0, wantInt64},
+		{"UnaryMinus Int32 -> Int64", pb.CombinationNode_UNARY_MINUS, 0, 0, wantInt64},
 		{"UnaryMinus Double -> Double", pb.CombinationNode_UNARY_MINUS, 1, 0, &descriptorpb.FieldDescriptorProto{
 			Type: descriptorpb.FieldDescriptorProto_TYPE_DOUBLE.Enum(),
 		}},
 		{"Int32 ^ Int32 -> Double", pb.CombinationNode_POWER, 0, 0, &descriptorpb.FieldDescriptorProto{
 			Type: descriptorpb.FieldDescriptorProto_TYPE_DOUBLE.Enum(),
 		}},
+		// FIXED32
+		{"Fixed32 + Fixed32 -> Int64", pb.CombinationNode_ADD, 2, 2, wantInt64},
+		{"Fixed32 - Fixed32 -> Int64", pb.CombinationNode_SUBTRACT, 2, 2, wantInt64},
+		{"Fixed32 * Fixed32 -> Int64", pb.CombinationNode_MULTIPLY, 2, 2, wantInt64},
+		{"Absolute Fixed32 -> Int64", pb.CombinationNode_ABSOLUTE, 2, 0, wantInt64},
+		{"UnaryMinus Fixed32 -> Int64", pb.CombinationNode_UNARY_MINUS, 2, 0, wantInt64},
+		// FIXED64
+		{"Fixed64 + Fixed64 -> Int64", pb.CombinationNode_ADD, 3, 3, wantInt64},
+		{"Fixed64 - Fixed64 -> Int64", pb.CombinationNode_SUBTRACT, 3, 3, wantInt64},
+		{"Fixed64 * Fixed64 -> Int64", pb.CombinationNode_MULTIPLY, 3, 3, wantInt64},
+		{"Absolute Fixed64 -> Int64", pb.CombinationNode_ABSOLUTE, 3, 0, wantInt64},
+		{"UnaryMinus Fixed64 -> Int64", pb.CombinationNode_UNARY_MINUS, 3, 0, wantInt64},
+		// SFIXED32
+		{"SFixed32 + SFixed32 -> Int64", pb.CombinationNode_ADD, 4, 4, wantInt64},
+		{"SFixed32 - SFixed32 -> Int64", pb.CombinationNode_SUBTRACT, 4, 4, wantInt64},
+		{"SFixed32 * SFixed32 -> Int64", pb.CombinationNode_MULTIPLY, 4, 4, wantInt64},
+		{"Absolute SFixed32 -> Int64", pb.CombinationNode_ABSOLUTE, 4, 0, wantInt64},
+		{"UnaryMinus SFixed32 -> Int64", pb.CombinationNode_UNARY_MINUS, 4, 0, wantInt64},
+		// SFIXED64
+		{"SFixed64 + SFixed64 -> Int64", pb.CombinationNode_ADD, 5, 5, wantInt64},
+		{"SFixed64 - SFixed64 -> Int64", pb.CombinationNode_SUBTRACT, 5, 5, wantInt64},
+		{"SFixed64 * SFixed64 -> Int64", pb.CombinationNode_MULTIPLY, 5, 5, wantInt64},
+		{"Absolute SFixed64 -> Int64", pb.CombinationNode_ABSOLUTE, 5, 0, wantInt64},
+		{"UnaryMinus SFixed64 -> Int64", pb.CombinationNode_UNARY_MINUS, 5, 0, wantInt64},
+		// TYPE_ENUM
+		{"Enum + Enum -> Int64", pb.CombinationNode_ADD, 6, 6, wantInt64},
+		{"Enum - Enum -> Int64", pb.CombinationNode_SUBTRACT, 6, 6, wantInt64},
+		{"Enum * Enum -> Int64", pb.CombinationNode_MULTIPLY, 6, 6, wantInt64},
+		{"Absolute Enum -> Int64", pb.CombinationNode_ABSOLUTE, 6, 0, wantInt64},
+		{"UnaryMinus Enum -> Int64", pb.CombinationNode_UNARY_MINUS, 6, 0, wantInt64},
 	}
 
 	for _, tt := range tests {
@@ -678,6 +772,27 @@ func TestResolveListExpressions(t *testing.T) {
 						TypeName: proto.String(".pkg.NestedMessage"),
 						Label:    descriptorpb.FieldDescriptorProto_LABEL_REPEATED.Enum(),
 					},
+					{
+						Name: proto.String("fixed32_idx"),
+						Type: descriptorpb.FieldDescriptorProto_TYPE_FIXED32.Enum(),
+					},
+					{
+						Name: proto.String("fixed64_idx"),
+						Type: descriptorpb.FieldDescriptorProto_TYPE_FIXED64.Enum(),
+					},
+					{
+						Name: proto.String("sfixed32_idx"),
+						Type: descriptorpb.FieldDescriptorProto_TYPE_SFIXED32.Enum(),
+					},
+					{
+						Name: proto.String("sfixed64_idx"),
+						Type: descriptorpb.FieldDescriptorProto_TYPE_SFIXED64.Enum(),
+					},
+					{
+						Name:     proto.String("enum_idx"),
+						Type:     descriptorpb.FieldDescriptorProto_TYPE_ENUM.Enum(),
+						TypeName: proto.String(".pkg.Enum"),
+					},
 				},
 			}
 		}
@@ -705,10 +820,25 @@ func TestResolveListExpressions(t *testing.T) {
 			pb.Node_builder{ConstantLeafNode: pb.ConstantLeafNode_builder{DoubleValue: proto.Float64(1.5)}.Build()}.Build(),
 			// Index 5: repeated_msg
 			pb.Node_builder{FieldLeafNode: pb.FieldLeafNode_builder{SourceName: "my_source", FieldNames: []string{"repeated_msg"}}.Build()}.Build(),
+			// Index 6: fixed32_idx
+			pb.Node_builder{FieldLeafNode: pb.FieldLeafNode_builder{SourceName: "my_source", FieldNames: []string{"fixed32_idx"}}.Build()}.Build(),
+			// Index 7: fixed64_idx
+			pb.Node_builder{FieldLeafNode: pb.FieldLeafNode_builder{SourceName: "my_source", FieldNames: []string{"fixed64_idx"}}.Build()}.Build(),
+			// Index 8: sfixed32_idx
+			pb.Node_builder{FieldLeafNode: pb.FieldLeafNode_builder{SourceName: "my_source", FieldNames: []string{"sfixed32_idx"}}.Build()}.Build(),
+			// Index 9: sfixed64_idx
+			pb.Node_builder{FieldLeafNode: pb.FieldLeafNode_builder{SourceName: "my_source", FieldNames: []string{"sfixed64_idx"}}.Build()}.Build(),
+			// Index 10: enum_idx
+			pb.Node_builder{FieldLeafNode: pb.FieldLeafNode_builder{SourceName: "my_source", FieldNames: []string{"enum_idx"}}.Build()}.Build(),
 		},
 	}.Build()
 
 	er := NewExpressionResolver(config.GetExpressionNodes(), mockGetSourceMessageName, mockGetDescriptorProto)
+
+	wantSingularInt32 := &descriptorpb.FieldDescriptorProto{
+		Type:  descriptorpb.FieldDescriptorProto_TYPE_INT32.Enum(),
+		Label: nil,
+	}
 
 	tests := []struct {
 		name     string
@@ -739,10 +869,7 @@ func TestResolveListExpressions(t *testing.T) {
 				LeftIndex:    proto.Uint32(0),
 				RightIndex:   proto.Uint32(2),
 			}.Build(),
-			wantDesc: &descriptorpb.FieldDescriptorProto{
-				Type:  descriptorpb.FieldDescriptorProto_TYPE_INT32.Enum(),
-				Label: nil,
-			},
+			wantDesc: wantSingularInt32,
 		},
 		{
 			name: "repeated_int[-1] -> INT32 (singular)",
@@ -751,10 +878,52 @@ func TestResolveListExpressions(t *testing.T) {
 				LeftIndex:    proto.Uint32(0),
 				RightIndex:   proto.Uint32(3),
 			}.Build(),
-			wantDesc: &descriptorpb.FieldDescriptorProto{
-				Type:  descriptorpb.FieldDescriptorProto_TYPE_INT32.Enum(),
-				Label: nil,
-			},
+			wantDesc: wantSingularInt32,
+		},
+		{
+			name: "repeated_int[fixed32_idx] -> INT32 (singular)",
+			node: pb.CombinationNode_builder{
+				ListOperator: pb.CombinationNode_SUBSCRIPT.Enum(),
+				LeftIndex:    proto.Uint32(0),
+				RightIndex:   proto.Uint32(6),
+			}.Build(),
+			wantDesc: wantSingularInt32,
+		},
+		{
+			name: "repeated_int[fixed64_idx] -> INT32 (singular)",
+			node: pb.CombinationNode_builder{
+				ListOperator: pb.CombinationNode_SUBSCRIPT.Enum(),
+				LeftIndex:    proto.Uint32(0),
+				RightIndex:   proto.Uint32(7),
+			}.Build(),
+			wantDesc: wantSingularInt32,
+		},
+		{
+			name: "repeated_int[sfixed32_idx] -> INT32 (singular)",
+			node: pb.CombinationNode_builder{
+				ListOperator: pb.CombinationNode_SUBSCRIPT.Enum(),
+				LeftIndex:    proto.Uint32(0),
+				RightIndex:   proto.Uint32(8),
+			}.Build(),
+			wantDesc: wantSingularInt32,
+		},
+		{
+			name: "repeated_int[sfixed64_idx] -> INT32 (singular)",
+			node: pb.CombinationNode_builder{
+				ListOperator: pb.CombinationNode_SUBSCRIPT.Enum(),
+				LeftIndex:    proto.Uint32(0),
+				RightIndex:   proto.Uint32(9),
+			}.Build(),
+			wantDesc: wantSingularInt32,
+		},
+		{
+			name: "repeated_int[enum_idx] -> INT32 (singular)",
+			node: pb.CombinationNode_builder{
+				ListOperator: pb.CombinationNode_SUBSCRIPT.Enum(),
+				LeftIndex:    proto.Uint32(0),
+				RightIndex:   proto.Uint32(10),
+			}.Build(),
+			wantDesc: wantSingularInt32,
 		},
 		{
 			name: "repeated_msg[0] -> MESSAGE (singular)",
