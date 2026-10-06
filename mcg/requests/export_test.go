@@ -16,7 +16,6 @@ package requests
 
 var (
 	Validate                         = (*FieldAssignmentRequest).validate
-	ValidateFieldAssignmentRequest   = (*MessageBuilderRequest).validateFieldAssignmentRequest
 	CheckDoesNotHaveMultipleSources  = (*DeprecatedSourceRequest).checkDoesNotHaveMultipleSources
 	CheckDoesNotHaveMultipleTriggers = (*TriggerRequest).checkDoesNotHaveMultipleTriggers
 	ParseConditionType               = (*ConditionalTriggerRequest).parseConditionType

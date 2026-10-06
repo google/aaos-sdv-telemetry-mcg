@@ -36,9 +36,8 @@ func TestValidFieldAssignmentRequestValidationsPass(t *testing.T) {
 		{Type: requests.AggregationTypeVector, Expression: "9", MaxLength: &maxLen},
 	} {
 		req := &requests.FieldAssignmentRequest{
-			FieldName:     "FieldName",
-			UserFieldType: "UserFieldType",
-			Aggregation:   val,
+			FieldName:   "FieldName",
+			Aggregation: val,
 		}
 		if err := requests.Validate(req); err != nil {
 			t.Fatal(err)
@@ -88,9 +87,8 @@ func TestValidatingInvalidExpressionsInFieldAssignmentRequestsFail(t *testing.T)
 		},
 	} {
 		req := &requests.FieldAssignmentRequest{
-			FieldName:     "FieldName",
-			UserFieldType: "UserFieldType",
-			Aggregation:   val.aggReq,
+			FieldName:   "FieldName",
+			Aggregation: val.aggReq,
 		}
 		if err := requests.Validate(req); val.expectedErr != err.Status.Message {
 			t.Errorf("With aggregation_type %s wanted %s, but got %s", val.aggReq.Type, val.expectedErr, err.Status.Message)
@@ -113,9 +111,8 @@ func TestValidatingInvalidMaxLengthsInFieldAssignmentRequestsFail(t *testing.T) 
 		{Type: requests.AggregationTypeSum, Expression: "1", MaxLength: &maxLen},
 	} {
 		req := &requests.FieldAssignmentRequest{
-			FieldName:     "FieldName",
-			UserFieldType: "UserFieldType",
-			Aggregation:   val,
+			FieldName:   "FieldName",
+			Aggregation: val,
 		}
 		if err := requests.Validate(req); want != err.Status.Message {
 			t.Errorf("With aggregation_type %s wanted %s, but got %s", val.Type, want, err.Status.Message)
@@ -125,63 +122,12 @@ func TestValidatingInvalidMaxLengthsInFieldAssignmentRequestsFail(t *testing.T) 
 
 func TestValidatingEmptyAggregationTypeInFieldAssignmentRequestsFail(t *testing.T) {
 	req := &requests.FieldAssignmentRequest{
-		FieldName:     "FieldName",
-		UserFieldType: "UserFieldType",
-		Aggregation:   requests.AggregationRequest{},
+		FieldName:   "FieldName",
+		Aggregation: requests.AggregationRequest{},
 	}
 
 	want := "Field assignment aggregation missing"
 	if err := requests.Validate(req); want != err.Status.Message {
-		t.Errorf("wanted %s, but got %s", want, err.Status.Message)
-	}
-}
-
-func TestValidateFieldAssignmentRequestWithMessageTypeDefinedPasses(t *testing.T) {
-	req := &requests.MessageBuilderRequest{
-		MessageType: "MessageType",
-		FieldAssignments: []requests.FieldAssignmentRequest{
-			{
-				FieldName:   "FieldName",
-				Aggregation: requests.AggregationRequest{},
-			},
-		},
-	}
-
-	if err := requests.ValidateFieldAssignmentRequest(req, &req.FieldAssignments[0]); err != nil {
-		t.Fatal(err)
-	}
-}
-
-func TestValidateFieldAssignmentRequestWithUserFieldTypeDefinedPasses(t *testing.T) {
-	req := &requests.MessageBuilderRequest{
-		FieldAssignments: []requests.FieldAssignmentRequest{
-			{
-				FieldName:     "FieldName",
-				UserFieldType: "UserFieldType",
-				Aggregation:   requests.AggregationRequest{},
-			},
-		},
-	}
-
-	if err := requests.ValidateFieldAssignmentRequest(req, &req.FieldAssignments[0]); err != nil {
-		t.Fatal(err)
-	}
-}
-
-func TestValidateFieldAssignmentRequestWithBothMessageTypeAndUserFieldTypeDefinedFails(t *testing.T) {
-	req := &requests.MessageBuilderRequest{
-		MessageType: "MessageType",
-		FieldAssignments: []requests.FieldAssignmentRequest{
-			{
-				FieldName:     "FieldName",
-				UserFieldType: "UserFieldType",
-				Aggregation:   requests.AggregationRequest{},
-			},
-		},
-	}
-
-	want := "Cannot specify both field_assignment[*].field_type and message_builder.message_type"
-	if err := requests.ValidateFieldAssignmentRequest(req, &req.FieldAssignments[0]); want != err.Status.Message {
 		t.Errorf("wanted %s, but got %s", want, err.Status.Message)
 	}
 }

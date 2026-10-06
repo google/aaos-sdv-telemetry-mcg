@@ -149,7 +149,6 @@ func (req *MetricsConfigRequest) ToSession(ctx context.Context) (*session.Sessio
 		ReportConfigs:               make(map[string]*pb.MetricsReportConfig),
 		Expressions:                 make(map[uint32]expressions.Text),
 		NextUncompiledExpressionID:  1,
-		FieldTypes:                  make(map[session.FieldTypeLocation]string),
 		DataSourceMessageTypes:      make(map[string]string),
 		IgnoreValidations:           false,
 		NoMessageInference:          false,

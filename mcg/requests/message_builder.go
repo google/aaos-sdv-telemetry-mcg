@@ -49,10 +49,8 @@ type AggregationRequest struct {
 }
 
 type FieldAssignmentRequest struct {
-	FieldName string `json:"field_name"`
-	// When message type inference is used, this field can be used to override the results of expression type inference.
-	UserFieldType string             `json:"field_type,omitempty"`
-	Aggregation   AggregationRequest `json:"aggregation"`
+	FieldName   string             `json:"field_name"`
+	Aggregation AggregationRequest `json:"aggregation"`
 }
 
 func (req *FieldAssignmentRequest) validate() *mcgerrors.StatusError {
@@ -141,26 +139,12 @@ func (req *FieldAssignmentRequest) toProto(path *session.MessageBuilderLocation,
 	return fieldAss, nil
 }
 
-func (req *MessageBuilderRequest) validateFieldAssignmentRequest(fieldAssReq *FieldAssignmentRequest) *mcgerrors.StatusError {
-	if fieldAssReq.UserFieldType != "" && req.MessageType != "" {
-		return mcgerrors.InvalidArgument("Cannot specify both field_assignment[*].field_type and message_builder.message_type")
-	}
-	return nil
-}
-
 func (req *MessageBuilderRequest) toProto(path session.MessageBuilderLocation, session *session.Session) (*pb.ProtoMessageBuilder, *mcgerrors.StatusError) {
 	protoMsgBuilder := pb.ProtoMessageBuilder_builder{
 		MessageType: req.MessageType,
 	}.Build()
 
 	for _, fieldAssReq := range req.FieldAssignments {
-		if fieldAssReq.UserFieldType != "" {
-			session.SaveFieldType(path.WithFieldName(fieldAssReq.FieldName), fieldAssReq.UserFieldType)
-		}
-		if err := req.validateFieldAssignmentRequest(&fieldAssReq); err != nil {
-			return nil, err
-		}
-
 		fieldAss, err := fieldAssReq.toProto(&path, session)
 		if err != nil {
 			return nil, err

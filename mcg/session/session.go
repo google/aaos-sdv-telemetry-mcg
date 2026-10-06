@@ -65,12 +65,6 @@ type Session struct {
 	// output MetricsConfig
 	ParsedTypes type_resolvers.EnrichedTypeResolver
 
-	// Key is the name of either an aggregator or MetricsReportConfig.
-	// The FieldName of the key is always the empty string.
-	//
-	// Value is either a protobuf primitive type name or a "."-prefixed message name.
-	FieldTypes map[FieldTypeLocation]string
-
 	// To bypass any validations for the metrics configs. Should default to false.
 	IgnoreValidations bool
 
@@ -97,13 +91,6 @@ func (s *Session) ExprStash(ptr *uint32, expr string) {
 	s.Expressions[*ptr] = expressions.Text{Uncompiled: expr}
 }
 
-// Fully described path to a FieldAssignment in order to stash the user-specified field type.
-type FieldTypeLocation struct {
-	IsSource      bool
-	ContainerName string
-	FieldName     string
-}
-
 type MessageBuilderLocation struct {
 	IsSource      bool
 	ContainerName string
@@ -115,17 +102,4 @@ func (m *MessageBuilderLocation) ContainerPath() string {
 	} else {
 		return fmt.Sprintf("metrics_report_configs[%s]", m.ContainerName)
 	}
-}
-
-func (m *MessageBuilderLocation) WithFieldName(fieldName string) FieldTypeLocation {
-	return FieldTypeLocation{
-		IsSource:      m.IsSource,
-		ContainerName: m.ContainerName,
-		FieldName:     fieldName,
-	}
-}
-
-// Save a user-specified type inference hint to the session
-func (s *Session) SaveFieldType(path FieldTypeLocation, hint string) {
-	s.FieldTypes[path] = hint
 }

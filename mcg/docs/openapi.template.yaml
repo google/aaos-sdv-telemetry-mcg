@@ -767,10 +767,6 @@ components:
         field_name:
           type: string
           description: A user-defined name for the field.
-        field_type:
-          type: string
-          description: "When message type inference is used, this field can be used\
-            \ to override the results of expression type inference."
     requests.MessageBuilderRequest:
       type: object
       properties:

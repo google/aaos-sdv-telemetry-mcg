@@ -786,41 +786,6 @@ func TestGenerateAndValidateWithProtobufBytesPasses(t *testing.T) {
 	}
 }
 
-func TestFieldType(t *testing.T) {
-	ctx := t.Context()
-	router, _ := setupServer(ctx, t, false)
-
-	var mcr requests.MetricsConfigRequest
-
-	json.Unmarshal([]byte(`{
-		"report_configs": [{
-			"name": "abcXYZ",
-			"report_incomplete": true,
-			"message_builder": {
-				"field_assignments": [{
-					"field_name": "field1",
-					"field_type": ".google.protobuf.Int32Value",
-					"aggregation": {
-						"@type": "none",
-						"expression": "4.2"
-					}
-				}]
-			}
-		}]
-	}`), &mcr)
-
-	w := httptest.NewRecorder()
-	c := gin.CreateTestContextOnly(w, router)
-	sess, errorList := mcr.ToSession(c)
-	if len(errorList) > 0 {
-		t.Fatal(errorList)
-	}
-
-	if len(sess.FieldTypes) == 0 {
-		t.Error("no types stashed")
-	}
-}
-
 func TestIgnoreValidations(t *testing.T) {
 	ctx := t.Context()
 	router, _ := setupServer(ctx, t, false)
