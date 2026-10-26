@@ -34,14 +34,16 @@ capture_test_logs() {
 # Run capture_test_logs when the script exits
 trap capture_test_logs EXIT
 
+TEMP="${TEMP:-/tmp}"
+
 # Go wants a cache directory.
 export XDG_CACHE_HOME="${TEMP}/.cache"
-mkdir "${XDG_CACHE_HOME}"
+mkdir -p "${XDG_CACHE_HOME}"
 
 # Prepend a custom `bin` directory to the `PATH`, so that we can overwrite
 # system-installed binaries with our own binaries (e.g., for `bazel`).
 CUSTOM_BINARY_DIR="${TEMP}/bin"
-mkdir "${CUSTOM_BINARY_DIR}"
+mkdir -p "${CUSTOM_BINARY_DIR}"
 export PATH="${CUSTOM_BINARY_DIR}:${PATH}"
 
 # Install Bazelisk as the `bazel` command.
@@ -52,28 +54,6 @@ chmod a+x "${BAZELISK_PATH}"
 if [ "$(which bazel)" != "${BAZELISK_PATH}" ]; then
   echo "Failed to install bazelisk as bazel."
   exit 1
-fi
-
-# Set up non-root user. We need this as the Bazel python toolchain does not
-# allow to be running as root
-# https://github.com/bazelbuild/rules_python/issues/1169
-echo "Setting up non-root user for Bazel"
-useradd -m -s /bin/bash bazeluser
-# Give the user access to the necessary directories.
-chmod -R a+rw "${MCG_REPO}"
-chmod -R a+rw "${XDG_CACHE_HOME}"
-
-# Grant Bazel tests access to the Docker daemon. The docker daemon acts as a proxy
-# to the host's daemon to enable docker-in-docker (DinD). We use the numeric group ID
-# (GID) of the mounted socket because the named 'docker' group might not exist inside
-# this container image or map to the correct GID from the host.
-if [ -e /var/run/docker.sock ]; then
-  DOCKER_GID=$(stat -c '%g' /var/run/docker.sock)
-  if ! getent group "$DOCKER_GID" > /dev/null 2>&1; then
-    groupadd -g "$DOCKER_GID" docker_host
-  fi
-  DOCKER_GROUP=$(getent group "$DOCKER_GID" | cut -d: -f1)
-  usermod -aG "$DOCKER_GROUP" bazeluser
 fi
 
 FAILURE=0
@@ -96,13 +76,13 @@ run_test() {
     fi
 }
 
-run_test runuser -u bazeluser -- bazel test --test_env=KOKORO=1 --test_output=all //...
+run_test bazel test --test_env=KOKORO=1 --test_output=all //...
 
-run_test runuser -u bazeluser -- bazel run //tools:buildifier -- -lint fix -r .
-run_test runuser -u bazeluser -- bazel run //tools:go -- run cmd/gofmt -l -w **/*.go
-run_test runuser -u bazeluser -- bazel run //tools:gazelle -- --strict
-run_test runuser -u bazeluser -- bazel run //tools:go -- mod tidy
-run_test runuser -u bazeluser -- bazel mod tidy
+run_test bazel run //tools:buildifier -- -lint fix -r .
+run_test bazel run //tools:go -- run cmd/gofmt -l -w **/*.go
+run_test bazel run //tools:gazelle -- --strict
+run_test bazel run //tools:go -- mod tidy
+run_test bazel mod tidy
 
 git config --global --add safe.directory "${MCG_REPO}"
 run_test git diff --exit-code HEAD
