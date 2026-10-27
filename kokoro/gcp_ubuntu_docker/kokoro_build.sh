@@ -26,10 +26,33 @@ cd "${MCG_REPO}"
 #    when uploading artifacts.
 # 2. Rename `test.log` into `sponge_log.log` and `test.xml` into
 #    `sponge_log.xml`, which are the filenames Sponge expects.
+# 3. Clean up Bazel convenience symlinks (bazel-bin, bazel-out, bazel-testlogs,
+#    bazel-mcg) because Kokoro RBE rejects output containing absolute symlinks.
+# shellcheck disable=SC2317,SC2329
 capture_test_logs() {
-  find -L "bazel-testlogs" \( -name "test.log" -o -name "test.xml" \) -exec cp --parents {} "${KOKORO_ARTIFACTS_DIR}" \;
-  find "${KOKORO_ARTIFACTS_DIR}/bazel-testlogs" -name "test.log" -exec bash -c 'mv "$1" "${1/%test.log/sponge_log.log}"' bash {} \;
-  find "${KOKORO_ARTIFACTS_DIR}/bazel-testlogs" -name "test.xml" -exec bash -c 'mv "$1" "${1/%test.xml/sponge_log.xml}"' bash {} \;
+  if [[ -e /var/run/docker.sock ]]; then
+    docker network disconnect bridge "$(hostname)" 2>/dev/null || true
+  fi
+  if [[ -n "${KOKORO_ARTIFACTS_DIR:-}" ]]; then
+    if [[ -d "${MCG_REPO}/bazel-testlogs" ]]; then
+      mkdir -p "${KOKORO_ARTIFACTS_DIR}/bazel-testlogs"
+      (
+        cd "${MCG_REPO}"
+        find -L "bazel-testlogs" \( -name "test.log" -o -name "test.xml" \) \
+          -exec cp --parents {} "${KOKORO_ARTIFACTS_DIR}" \; 2>/dev/null || true
+      )
+    fi
+    # Kokoro RBE rejects build output containing symlinks to absolute paths,
+    # which is what Bazel's convenience symlinks (bazel-bin, bazel-out,
+    # bazel-testlogs, bazel-<repo>) are. Remove them once the logs are copied.
+    find "${MCG_REPO}" -maxdepth 1 -name "bazel-*" -type l -delete 2>/dev/null || true
+    if [[ -d "${KOKORO_ARTIFACTS_DIR}/bazel-testlogs" ]]; then
+      find "${KOKORO_ARTIFACTS_DIR}/bazel-testlogs" -name "test.log" \
+        -exec bash -c 'mv "$1" "${1/%test.log/sponge_log.log}"' bash {} \; 2>/dev/null || true
+      find "${KOKORO_ARTIFACTS_DIR}/bazel-testlogs" -name "test.xml" \
+        -exec bash -c 'mv "$1" "${1/%test.xml/sponge_log.xml}"' bash {} \; 2>/dev/null || true
+    fi
+  fi
 }
 # Run capture_test_logs when the script exits
 trap capture_test_logs EXIT
@@ -75,6 +98,14 @@ run_test() {
         echo
     fi
 }
+
+# Under Kokoro RBE (docker_sibling_containers), the build container runs in its
+# own network namespace while sibling containers attach to the host's default
+# bridge network (172.17.0.0/16). Connect this container to `bridge` so tests
+# can reach sibling container IPs directly.
+if [[ -e /var/run/docker.sock ]]; then
+  docker network connect bridge "$(hostname)" 2>/dev/null || true
+fi
 
 run_test bazel test --test_env=KOKORO=1 --test_output=all //...
 
